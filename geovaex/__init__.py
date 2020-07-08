@@ -12,15 +12,6 @@ from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
 
-# def open(path, convert=False, shuffle=False, copy_index=False, *args, **kwargs):
-#     from geovaex.GeometryType import GeometryType
-#     import pyarrow as pa
-#     geometry_type = GeometryType()
-#     pa.register_extension_type(geometry_type)
-#     df = vaex.open(path, convert=convert, shuffle=shuffle, copy_index=copy_index, *args, **kwargs)
-#     df['pygeos'] = df.apply(pg.from_wkb, arguments=[df.geometry])
-#     return df
-
 def open(path):
     source = pa.memory_map(path)
     try:
@@ -50,24 +41,25 @@ def _load_table(table):
         raise Exception('ERROR: Geometry not found in file.')
     # Geometry
     geometry = table.column('geometry')
+    crs = table.schema.field('geometry').metadata[b'crs'].decode()
     # Vaex dataframe
     if num_chunks > 1:
         dataframes = [DatasetArrow(table=t) for t, chunk in _split_table(table, num_chunks)]
         df = DataFrameConcatenated(dataframes)
     else:
-        df = _create_df(table, geometry)
-    return from_df(df=df, geometry=geometry)
+        df = _create_df(table)
+    return from_df(df=df, geometry=geometry, crs=crs)
 
 
-def _create_df(table, geometry):
+def _create_df(table):
     new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
     pa_arrays = [table.column(entry.name).chunk(0) for entry in new_schema]
     t = pa.Table.from_arrays(pa_arrays, schema=new_schema)
     df = DatasetArrow(table=t)
     return df
 
-def from_df(df, geometry):
-    copy = GeoDataFrame(geometry=geometry)
+def from_df(df, geometry, crs=None):
+    copy = GeoDataFrame(geometry=geometry, crs=crs)
     copy._length_unfiltered = df._length_unfiltered
     copy._length_original = df._length_original
     copy._cached_filtered_length = df._cached_filtered_length

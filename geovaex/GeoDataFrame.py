@@ -3,9 +3,9 @@ from vaex.dataframe import DataFrameLocal
 import geovaex.io
 
 class GeoDataFrame(DataFrameLocal):
-    def __init__(self, geometry, path=None):
+    def __init__(self, geometry, crs=None, path=None):
         super(GeoDataFrame, self).__init__(name=path, path=path, column_names=[])
-        self._geoseries = GeoSeries(geometry)
+        self._geoseries = GeoSeries(geometry, crs=crs)
 
     @property
     def geometry(self):
@@ -66,10 +66,10 @@ class GeoDataFrame(DataFrameLocal):
 
     def take(self, indices):
         geometry = self.geometry.take(indices)
-        return geovaex.from_df(geometry=geometry.get_raw_geometry(), df=super(GeoDataFrame, self).take(indices))
+        return geovaex.from_df(geometry=geometry.get_raw_geometry(), crs=self.geometry.crs, df=super(GeoDataFrame, self).take(indices))
 
     def copy(self, column_names=None, virtual=True):
-        df = geovaex.from_df(df=self, geometry=self.geometry.get_raw_geometry())
+        df = geovaex.from_df(df=self, geometry=self.geometry.get_raw_geometry(), crs=self.geometry.crs)
         i1, i2 = self.get_active_range()
         df.geometry.set_active_range(i1, i2)
         return df
@@ -83,4 +83,4 @@ class GeoDataFrame(DataFrameLocal):
         if inplace:
             self.geoseries = self.geometry.convex_hull()
         else:
-            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull().get_raw_geometry())
+            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull().get_raw_geometry(), crs=self.geometry.crs)

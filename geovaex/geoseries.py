@@ -1,12 +1,14 @@
 import pyarrow as pa
 import pygeos as pg
 import concurrent.futures
+import pyproj
 from .funcs import *
 
 class GeoSeries(object):
 
-    def __init__(self, geometry):
+    def __init__(self, geometry, crs=None):
         self._geometry = geometry
+        self._crs = crs if crs is None or isinstance(crs, pyproj.crs.crs.CRS) else pyproj.crs.CRS(crs)
         self._active_fraction = 1
         self._index_start = 0
         self._length_original = len(geometry)
@@ -18,6 +20,10 @@ class GeoSeries(object):
         if self._length != self._length_original:
             return self._geometry[self._index_start:self._index_end]
         return self._geometry
+
+    @property
+    def crs(self):
+        return self._crs
 
     def __repr__(self):
         return self._head_and_tail_table(format='plain')

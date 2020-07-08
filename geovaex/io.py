@@ -27,10 +27,15 @@ def read_file(file, output='ogr', targetCRS=None, point_cols=None):
                 dataSource = to_dataframe(dataSource, targetCRS)
             return dataSource
 
-def to_arrow(input_file, arrow_file, point_cols=None, chunksize=8000000):
+def to_arrow(input_file, arrow_file, point_cols=None, chunksize=2000000, targetCRS=None):
     path, ext = os.path.splitext(arrow_file)
     ds = read_file(input_file, point_cols=point_cols)
     layer = ds.GetLayer()
+    crs = get_crs(layer)
+    crs = crs if crs is not None else targetCRS
+    if (crs != targetCRS):
+        # TODO Project to targetCRS
+        pass
     length = layer.GetFeatureCount()
     print('Found %i features.' % (length))
     lower = 0
@@ -39,7 +44,7 @@ def to_arrow(input_file, arrow_file, point_cols=None, chunksize=8000000):
         writer = None
         for i in range(1, length//chunksize + 2):
             upper = min(i*chunksize, length)
-            table = _export_table(layer, lower, upper)
+            table = _export_table(layer, crs, lower, upper)
             b = table.to_batches()
             if writer is None:
                 writer = pa.RecordBatchStreamWriter(sink, b[0].schema)
@@ -47,7 +52,7 @@ def to_arrow(input_file, arrow_file, point_cols=None, chunksize=8000000):
             lower = upper
     sink.close()
 
-def _export_table(layer, lower, upper):
+def _export_table(layer, crs, lower, upper):
     column_names = getDefinition(layer)
     arrow_arrays = []
 
@@ -58,13 +63,14 @@ def _export_table(layer, lower, upper):
     geometry = pa.array(storage)
     # geometry = pa.ExtensionArray.from_storage(GeometryType(), storage)
     arrow_arrays.append(geometry)
-    actual_columns = ['geometry']
+    fields = [pa.field('geometry', 'binary', metadata={'crs': crs})]
     for column_name in column_names:
         if column_name == 'geometry':
             continue
-        arrow_arrays.append(pa.array(layer.GetFeature(i).GetField(column_name) for i in range(lower, upper)))
-        actual_columns.append(column_name)
-    table = pa.Table.from_arrays(arrow_arrays, actual_columns)
+        arr = pa.array(layer.GetFeature(i).GetField(column_name) for i in range(lower, upper))
+        arrow_arrays.append(arr)
+        fields.append(pa.field(column_name, arr.type))
+    table = pa.Table.from_arrays(arrow_arrays, schema=pa.schema(fields))
     return table
 
 def to_arrow_from_csv(csv, arrow_file, geometry='wkt', point_cols=None, delimiter=','):
@@ -94,25 +100,6 @@ def _export_table_from_df(df, geometry_col):
         actual_columns.append(column_name)
     table = pa.Table.from_arrays(arrow_arrays, actual_columns)
     return table
-
-def to_dataframe(dataSource, targetCRS=None):
-
-    layer = dataSource.GetLayer()
-    del dataSource
-    # #create an output datasource in memory
-    # outdriver=ogr.GetDriverByName('MEMORY')
-    # source=outdriver.CreateDataSource('memData')
-    # tmp=outdriver.Open('memData',1)
-    # pipes_mem=source.CopyLayer(layer,'temp',['OVERWRITE=YES'])
-    # layer=source.GetLayer('temp')
-
-    crs = get_crs(layer)
-    crs = crs if crs is not None else targetCRS
-    if (crs != targetCRS):
-        # TODO Project to targetCRS
-        pass
-    frame = GeoDataFrame.from_ogr(layer, crs=crs)
-    return frame
 
 def get_crs(layer):
     spatialRef = layer.GetSpatialRef()
