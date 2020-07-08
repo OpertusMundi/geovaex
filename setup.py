@@ -19,6 +19,7 @@ setuptools.setup(
         'gdal>=2.3.0,<3.2.0',
         'numpy>=1.18.4,<1.18.5',
         'vaex>=3.0.0,<3.0.1'
+        'pyproj>=2.6.0,<2.7.0'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
