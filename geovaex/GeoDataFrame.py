@@ -1,5 +1,6 @@
 from .geoseries import GeoSeries
 from vaex.dataframe import DataFrameLocal
+import geovaex.io
 
 class GeoDataFrame(DataFrameLocal):
     def __init__(self, geometry, path=None):
