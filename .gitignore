@@ -1,0 +1,6 @@
+__pycache__/
+arrowGeometry.py
+spatial.py
+notebooks/_*
+notebooks/.ipynb_checkpoints
+notebooks/data/local/
