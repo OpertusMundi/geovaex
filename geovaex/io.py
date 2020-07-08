@@ -5,7 +5,6 @@ import sys
 import pyarrow as pa
 import pygeos as pg
 import numpy as np
-from geovaex.arrowGeometry import GeometryType
 
 def read_file(file, output='ogr', targetCRS=None, point_cols=None):
     filename = os.path.basename(file)
@@ -29,8 +28,6 @@ def read_file(file, output='ogr', targetCRS=None, point_cols=None):
             return dataSource
 
 def to_arrow(input_file, arrow_file, point_cols=None, chunksize=8000000):
-    geometry_type = GeometryType()
-    pa.register_extension_type(geometry_type)
     path, ext = os.path.splitext(arrow_file)
     ds = read_file(input_file, point_cols=point_cols)
     layer = ds.GetLayer()
@@ -58,9 +55,8 @@ def _export_table(layer, lower, upper):
     for i in range(lower, upper):
         feature = layer.GetFeature(i)
         storage.append(feature.GetGeometryRef().ExportToWkb())
-    storage = pa.array(storage)
-    # storage = pa.array(layer.GetFeature(i).GetGeometryRef().ExportToWkb() if layer.GetFeature(i).GetGeometryRef() else None for i in range(lower, upper))
-    geometry = pa.ExtensionArray.from_storage(GeometryType(), storage)
+    geometry = pa.array(storage)
+    # geometry = pa.ExtensionArray.from_storage(GeometryType(), storage)
     arrow_arrays.append(geometry)
     actual_columns = ['geometry']
     for column_name in column_names:
