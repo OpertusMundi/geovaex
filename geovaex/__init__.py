@@ -41,7 +41,10 @@ def _load_table(table):
         raise Exception('ERROR: Geometry not found in file.')
     # Geometry
     geometry = table.column('geometry')
-    crs = table.schema.field('geometry').metadata[b'crs'].decode()
+    try:
+        crs = table.schema.field('geometry').metadata[b'crs'].decode()
+    except:
+        crs = None
     # Vaex dataframe
     if num_chunks > 1:
         dataframes = [DatasetArrow(table=t) for t, chunk in _split_table(table, num_chunks)]
