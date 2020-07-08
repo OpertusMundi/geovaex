@@ -7,7 +7,7 @@ import geovaex.io
 import vaex
 import pyarrow as pa
 import pygeos as pg
-from geovaex.GeoDataFrame import GeoDataFrame
+from geovaex.geodataframe import GeoDataFrame
 from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
