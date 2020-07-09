@@ -1,6 +1,6 @@
 import pygeos as pg
 import pyarrow as pa
-from .lazy import Lazy
+from .lazy import Lazy, LazyObj
 
 @Lazy
 def from_wkb(arr):
@@ -19,17 +19,17 @@ def convex_hull(arr):
     return pg.to_wkb(pg.convex_hull(pg.from_wkb(arr)))
 
 def total_bounds(arr):
-    if isinstance(arr, Lazy):
+    if isinstance(arr, LazyObj):
         arr = arr.values()
     return pg.to_wkb(pg.box(*pg.total_bounds(pg.from_wkb(arr))))
 
 def union_all(arr):
-    if isinstance(arr, Lazy):
+    if isinstance(arr, LazyObj):
         arr = arr.values()
     return pg.union_all(from_wkb(arr))
 
 def convex_hull_all(arr):
-    if isinstance(arr, Lazy):
+    if isinstance(arr, LazyObj):
         arr = arr.values()
     points = pg.union_all(pg.extract_unique_points(pg.from_wkb(arr)))
     return pg.to_wkb(pg.convex_hull(points))

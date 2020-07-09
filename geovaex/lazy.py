@@ -1,14 +1,37 @@
 from pyarrow import ChunkedArray, Array
 import pygeos as pg
 
-class Lazy(object):
-    def __init__(self, function):
-        self._function = function
-        self._obj = None
+class LazyObj(object):
 
-    def __call__(self, obj):
-        self._obj = obj
-        return self
+    def __init__(self):
+        self._function = []
+        self._obj = None
+        self._args = []
+        self._counter = 0
+
+    @classmethod
+    def init(cls, function, obj, *args):
+        lz = cls()
+        lz._function.append(function)
+        lz._obj = obj
+        lz._args.append(args)
+        lz._counter += 1
+        return lz
+
+    def copy(self):
+        lz = LazyObj()
+        lz._function = [*self._function]
+        lz._obj = self._obj
+        lz._args = [*self._args]
+        lz._counter = self._counter
+        return lz
+
+    def add(self, function, *args):
+        lz = self.copy()
+        lz._function.append(function)
+        lz._args.append(args)
+        lz._counter += 1
+        return lz
 
     def __repr__(self):
         return self._head_and_tail_table()
@@ -16,14 +39,23 @@ class Lazy(object):
     def __getitem__(self, item):
         if isinstance(item, int):
             item = slice(item, item + 1)
-            return self._function(self._obj.__getitem__(item))[0]
-        return self._function(self._obj.__getitem__(item))
+            result = self._obj.__getitem__(item)
+            for i in range(self._counter):
+                result = self._function[i](result, *self._args[i])
+            return result[0]
+        result = self._obj.__getitem__(item)
+        for i in range(self._counter):
+            result = self._function[i](result, *self._args[i])
+        return result
 
     def __len__(self):
         return len(self._obj)
 
     def values(self):
-        return self._function(self._obj)
+        result = self._obj
+        for i in range(self._counter):
+            result = self._function[i](result)
+        return result
 
     def _head_and_tail_table(self, n=5, format='plain', to_wkt=True):
         N = len(self._obj)
@@ -31,7 +63,7 @@ class Lazy(object):
             table = self._as_table(0, N, format=format)
         else:
             table = self._as_table(0, n, N - n, N, format=format)
-        expression = "Expression = %s" % (self._function.__name__)
+        expression = "Expression = %s" % '*'.join(self._function[i-1].__name__ for i in range(self._counter, 0, -1))
         head = "Length: {:,} type: {}".format(N, type(self[0]))
         line = ''
         for i in range(len(head)):
@@ -57,3 +89,12 @@ class Lazy(object):
                     values_list.append([i, value])
 
         return str(tabulate.tabulate(values_list, tablefmt=format))
+
+class Lazy(object):
+    def __init__(self, function):
+        self._function = function
+
+    def __call__(self, obj, *args):
+        if isinstance(obj, LazyObj):
+            return obj.add(self._function, *args)
+        return LazyObj.init(self._function, obj, *args)

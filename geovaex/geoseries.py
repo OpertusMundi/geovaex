@@ -3,6 +3,7 @@ import pygeos as pg
 import concurrent.futures
 import pyproj
 from .funcs import *
+from .lazy import LazyObj
 
 class GeoSeries(object):
 
@@ -55,7 +56,8 @@ class GeoSeries(object):
         return self._active_geometry
 
     def copy(self):
-        gs = GeoSeries(self._geometry)
+        geometry = self._geometry.copy() if isinstance(self._geometry, LazyObj) else self._geometry
+        gs = GeoSeries(geometry, crs=self._crs)
         gs._active_fraction = self._active_fraction
         gs._index_start = self._index_start
         gs._length_original = self._length_original
@@ -68,7 +70,7 @@ class GeoSeries(object):
         if self._index_start == 0 and len(self._geometry) == self._index_end:
             pass  # we already assigned it in .copy
         else:
-            gs._geometry = self._geometry[self._index_start:self._index_end]
+            gs._geometry = gs._geometry[self._index_start:self._index_end]
         gs._active_fraction = 1
         gs._index_start = 0
         gs._length_original = self._index_end - self._index_start
@@ -154,7 +156,9 @@ class GeoSeries(object):
         return union_all(self._active_geometry)
 
     def convex_hull(self):
-        return GeoSeries(geometry=convex_hull(self._active_geometry))
+        gs = self.trim()
+        gs._geometry = convex_hull(gs._geometry)
+        return gs
 
     def vertices(self):
         return extract_unique_points(self._active_geometry)
@@ -168,7 +172,7 @@ class GeoSeries(object):
         futures = [executor.submit(function, group) for group in chunks]
         for f in concurrent.futures.as_completed(futures):
             result.append(f.result())
-        return GeoSeries(pa.array(result))
+        return GeoSeries(pa.array(result), crs=self._crs)
 
     def _total_bounds_single(self):
         return pg.box(*pg.total_bounds(self.to_pygeos()))
