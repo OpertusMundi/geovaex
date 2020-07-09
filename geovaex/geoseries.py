@@ -9,7 +9,7 @@ class GeoSeries(object):
 
     def __init__(self, geometry, crs=None):
         self._geometry = geometry
-        self._crs = crs if crs is None or isinstance(crs, pyproj.crs.crs.CRS) else pyproj.crs.CRS(crs)
+        self._crs = crs if crs is None or isinstance(crs, pyproj.crs.crs.CRS) else pyproj.crs.CRS.from_user_input(crs)
         self._active_fraction = 1
         self._index_start = 0
         self._length_original = len(geometry)
@@ -25,6 +25,17 @@ class GeoSeries(object):
     @property
     def crs(self):
         return self._crs
+
+    @crs.setter
+    def crs(self, crs):
+        self._crs = crs if crs is None or isinstance(crs, pyproj.crs.crs.CRS) else pyproj.crs.CRS.from_user_input(crs)
+
+    def to_crs(self, crs):
+        if self.crs is None:
+            self.crs = crs
+        else:
+            self._geometry = transform(self._geometry, self.crs, crs)
+            self.crs = crs
 
     def __repr__(self):
         return self._head_and_tail_table(format='plain')
@@ -145,7 +156,7 @@ class GeoSeries(object):
             offset += size
         if len(chunks) > 0:
             geometry = pa.concat_arrays(chunks)
-            return GeoSeries(geometry=geometry)
+            return GeoSeries(geometry=geometry, crs=self._crs)
         else:
             raise IndexError('ERROR: Out of range')
 
