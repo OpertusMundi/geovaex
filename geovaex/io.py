@@ -18,9 +18,8 @@ def read_file(file, output='ogr', targetCRS=None, point_cols=None):
         print(sys.exc_info()[1]);
     else:
         if dataSource is None:
-            print('Could not open %s' % (file))
+            raise FileNotFoundError('Could not open %s' % (file))
         else:
-            pass
             print('Opened file %s, using driver %s.' % (filename, dataSource.GetDriver().name))
 
             if (output == 'dataframe'):
