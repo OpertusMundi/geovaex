@@ -5,6 +5,7 @@ import sys
 import pyarrow as pa
 import pygeos as pg
 import numpy as np
+from ._version import __version__
 
 def read_file(file, output='ogr', targetCRS=None, point_cols=None):
     filename = os.path.basename(file)
@@ -43,7 +44,8 @@ def to_arrow(input_file, arrow_file, point_cols=None, chunksize=2000000, targetC
         writer = None
         for i in range(1, length//chunksize + 2):
             upper = min(i*chunksize, length)
-            table = _export_table(layer, crs, lower, upper)
+            metadata = {'source file': os.path.basename(input_file), 'driver': ds.GetDriver().name, 'geovaex version': __version__}
+            table = _export_table(layer, crs, lower, upper, metadata=metadata)
             b = table.to_batches()
             if writer is None:
                 writer = pa.RecordBatchStreamWriter(sink, b[0].schema)
@@ -51,7 +53,7 @@ def to_arrow(input_file, arrow_file, point_cols=None, chunksize=2000000, targetC
             lower = upper
     sink.close()
 
-def _export_table(layer, crs, lower, upper):
+def _export_table(layer, crs, lower, upper, metadata):
     column_names = getDefinition(layer)
     arrow_arrays = []
 
@@ -69,7 +71,7 @@ def _export_table(layer, crs, lower, upper):
         arr = pa.array(layer.GetFeature(i).GetField(column_name) for i in range(lower, upper))
         arrow_arrays.append(arr)
         fields.append(pa.field(column_name, arr.type))
-    table = pa.Table.from_arrays(arrow_arrays, schema=pa.schema(fields))
+    table = pa.Table.from_arrays(arrow_arrays, schema=pa.schema(fields, metadata=metadata))
     return table
 
 def to_arrow_from_csv(csv, arrow_file, geometry='wkt', point_cols=None, delimiter=','):

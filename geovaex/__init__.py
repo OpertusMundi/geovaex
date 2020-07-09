@@ -1,4 +1,4 @@
-import sys
+import sys, os
 try:
     from osgeo import ogr, gdal
 except:
@@ -11,6 +11,7 @@ from geovaex.geodataframe import GeoDataFrame
 from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
+from ._version import __version_tuple__, __version__
 
 def open(path):
     source = pa.memory_map(path)
@@ -26,6 +27,9 @@ def open(path):
         # if a stream, we're good
         batches = reader  # this reader is iterable
     table = pa.Table.from_batches(batches)
+    metadata = table.schema.metadata
+    if metadata:
+        print('Opened file %s, created by geovaex v.%s using GDAL driver %s.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
     return _load_table(table)
 
 def _split_table(table, num_chunks):
