@@ -21,6 +21,23 @@ def convex_hull(arr):
     return pg.to_wkb(pg.convex_hull(pg.from_wkb(arr)))
 
 @Lazy
+def get_coordinates(arr):
+    return pg.get_coordinates(pg.from_wkb(arr))
+
+@Lazy
+def get_inverted_coordinates(arr):
+    def invert_list(a):
+        if isinstance(a[0], np.ndarray):
+            return np.array([np.flip(arr) for arr in a])
+        else:
+            return np.flip(a)
+    return invert_list(pg.get_coordinates(pg.from_wkb(arr)))
+
+@Lazy
+def centroid(arr):
+    return pg.to_wkb(pg.centroid(pg.from_wkb(arr)))
+
+@Lazy
 def transform(arr, src_crs, tgt_crs):
     transformer = pyproj.Transformer.from_crs(src_crs, tgt_crs, always_xy=True)
 
@@ -49,3 +66,6 @@ def convex_hull_all(arr):
 @Lazy
 def extract_unique_points(arr):
     return pg.extract_unique_points(from_wkb(arr))
+
+def within(arr, geometry):
+    return pg.within(from_wkb(arr), geometry)
