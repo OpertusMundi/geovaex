@@ -5,7 +5,7 @@ import geovaex.io
 class GeoDataFrame(DataFrameLocal):
     def __init__(self, geometry, crs=None, path=None):
         super(GeoDataFrame, self).__init__(name=path, path=path, column_names=[])
-        self._geoseries = GeoSeries(geometry, crs=crs)
+        self._geoseries = geometry if isinstance(geometry, GeoSeries) else GeoSeries(geometry, crs=crs, df=self)
 
     @property
     def geometry(self):
@@ -54,33 +54,56 @@ class GeoDataFrame(DataFrameLocal):
 
     def __getitem__(self, item):
         if isinstance(item, int):
-            names = self.get_column_names()
-            row = [self.evaluate(name, item, item+1)[0] for name in names]
+            row = super(GeoDataFrame, self).__getitem__(item)
             row.append(self.geometry[item])
             return row
         return super(GeoDataFrame, self).__getitem__(item)
+
+    def take(self, indices, filtered=True, dropfilter=True):
+        df = self.trim()
+        geometry = df.geometry.take(indices, filtered=filtered)
+        return geovaex.from_df(geometry=geometry, df=super(GeoDataFrame, self).take(indices, filtered=filtered, dropfilter=dropfilter))
+
+    def copy(self, column_names=None, virtual=True):
+        df = geovaex.from_df(df=self, geometry=self.geometry.copy())
+        df.geometry._df = df
+        return df
 
     def set_active_range(self, i1, i2):
         super(GeoDataFrame, self).set_active_range(i1, i2)
         self.geometry.set_active_range(i1, i2)
 
-    def take(self, indices):
-        geometry = self.geometry.take(indices)
-        return geovaex.from_df(geometry=geometry.get_raw_geometry(), crs=self.geometry.crs, df=super(GeoDataFrame, self).take(indices))
-
-    def copy(self, column_names=None, virtual=True):
-        df = geovaex.from_df(df=self, geometry=self.geometry.get_raw_geometry(), crs=self.geometry.crs)
-        i1, i2 = self.get_active_range()
-        df.geometry.set_active_range(i1, i2)
-        return df
-
     def trim(self, inplace=False):
         df = super(GeoDataFrame, self).trim(inplace=inplace)
-        df._geoseries = df.geometry.trim(inplace=inplace)
+        df.geometry.trim(inplace=True)
         return df
 
     def convex_hull(self, inplace=False):
         if inplace:
-            self.geoseries = self.geometry.convex_hull()
+            self._geoseries = self.geometry.convex_hull()
         else:
-            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull().get_raw_geometry(), crs=self.geometry.crs)
+            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull())
+
+    def centroid(self, inplace=False):
+        df = self if inplace else self.trim()
+        df._geoseries = df.geometry.centroid()
+        return df
+
+    def within(self, geom):
+        filt = self.geometry.within(geom, chunksize=1000000, max_workers=None)
+        df = self.copy()
+        df.add_column('tmp', filt, dtype=bool)
+        df = df[df.tmp == True]
+        df.drop('tmp', inplace=True)
+        return df
+
+    def to_geopandas_df(self, column_names=None, selection=None, strings=True, virtual=True, index_name=None, parallel=True, chunk_size=None):
+        from shapely.wkb import loads
+        import geopandas as gpd
+        pd_df = super(GeoDataFrame, self).to_pandas_df(column_names=column_names, selection=selection, strings=strings, virtual=virtual, index_name=index_name, parallel=parallel, chunk_size=chunk_size)
+        geometries = self.geometry.to_numpy()
+        geometries = [loads(g) for g in geometries]
+        return gpd.GeoDataFrame(pd_df, geometry=geometries, crs=self.geometry.crs)
+
+    def to_vaex_df(self):
+        return super(GeoDataFrame, self).copy()
