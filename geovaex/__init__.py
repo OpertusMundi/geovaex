@@ -7,6 +7,8 @@ import geovaex.io
 import vaex
 import pyarrow as pa
 import pygeos as pg
+import numpy as np
+import collections
 from geovaex.geodataframe import GeoDataFrame
 from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
@@ -84,7 +86,7 @@ def from_df(df, geometry, crs=None):
     for key, value in df.selection_histories.items():
         if df.get_selection(key):
             copy.selection_histories[key] = list(value)
-            if key == FILTER_SELECTION_NAME:
+            if key == '__filter__':
                 copy._selection_masks[key] = df._selection_masks[key]
             else:
                 copy._selection_masks[key] = vaex.superutils.Mask(copy._length_original)
@@ -105,10 +107,11 @@ def from_df(df, geometry, crs=None):
             if isinstance(column, ColumnSparse):
                 copy._sparse_matrices[name] = df._sparse_matrices[name]
         elif name in df.virtual_columns:
-            if virtual:
-                copy.add_virtual_column(name, df.virtual_columns[name])
-                deps = [key for key, value in copy._virtual_expressions[name].ast_names.items()]
-                depending.update(deps)
+            pass
+            # if virtual:
+            #     copy.add_virtual_column(name, df.virtual_columns[name])
+            #     deps = [key for key, value in copy._virtual_expressions[name].ast_names.items()]
+            #     depending.update(deps)
         else:
             real_column_name = copy._column_aliases.get(name, name)
             valid_name = vaex.utils.find_valid_name(name)
@@ -117,7 +120,7 @@ def from_df(df, geometry, crs=None):
             deps = [key for key, value in copy._virtual_expressions[valid_name].ast_names.items()]
             depending.update(deps)
     if df.filtered:
-        selection = df.get_selection(FILTER_SELECTION_NAME)
+        selection = df.get_selection('__filter__')
         depending |= selection._depending_columns(df)
     depending.difference_update(added)
 
