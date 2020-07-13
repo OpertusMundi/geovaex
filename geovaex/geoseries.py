@@ -196,6 +196,9 @@ class GeoSeries(object):
     def to_pygeos(self):
         return from_wkb(self._active_geometry)
 
+    def to_wkt(self):
+        return to_wkt(self._active_geometry)
+
     def union_all(self):
         return union_all(self._active_geometry)
 
@@ -204,11 +207,22 @@ class GeoSeries(object):
         gs._geometry = convex_hull(gs._geometry)
         return gs
 
+    def centroid(self):
+        gs = self.trim()
+        gs._geometry = centroid(gs._active_geometry)
+        return gs
+
     def vertices(self):
         return extract_unique_points(self._active_geometry)
 
     def all_vertices(self):
         return self.vertices().union_all()
+
+    def get_coordinates(self, invert=False):
+        if invert:
+            return get_inverted_coordinates(self._active_geometry)
+        else:
+            return get_coordinates(self._active_geometry)
 
     def _multiprocess(self, function, chunks, max_workers=None):
         result = []
@@ -239,3 +253,23 @@ class GeoSeries(object):
         hulls = self._multiprocess(convex_hull_all, chunks, max_workers=max_workers)
         hulls = GeoSeries(pa.array(hulls), crs=self._crs, df=self._df)
         return hulls.convex_hull_all(chunksize=chunksize, max_workers=max_workers)
+
+    def _within_single(self, geometry):
+        return within(self._active_geometry, geometry)
+
+    def within(self, geometry, chunksize=1000000, max_workers=None):
+        chunks = self.chunked(chunksize)
+        if len(chunks) == 1:
+            return self._within_single(geometry)
+        pieces = self._multiprocess(within, chunks, max_workers=max_workers)
+        return np.concatenate(pieces)
+
+    def to_numpy(self):
+        if isinstance(self._active_geometry, LazyObj):
+            narray = np.array(self._active_geometry.values())
+        elif isinstance(self._active_geometry, pa.ChunkedArray):
+            chunks = [chunk.to_numpy(zero_copy_only=False) for chunk in self._active_geometry.chunks]
+            narray = np.concatenate(chunks)
+        else:
+            narray = self._active_geometry.to_numpy(zero_copy_only=False)
+        return narray
