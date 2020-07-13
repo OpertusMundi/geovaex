@@ -1,4 +1,4 @@
-from pyarrow import ChunkedArray, Array
+from pyarrow import ChunkedArray, Array, array, concat_arrays
 import pygeos as pg
 
 class LazyObj(object):
@@ -12,6 +12,7 @@ class LazyObj(object):
     @classmethod
     def init(cls, function, obj, *args):
         lz = cls()
+        assert isinstance(obj, (ChunkedArray, Array))
         lz._function.append(function)
         lz._obj = obj
         lz._args.append(args)
@@ -31,6 +32,34 @@ class LazyObj(object):
         lz._function.append(function)
         lz._args.append(args)
         lz._counter += 1
+        return lz
+
+    def take(self, indices):
+        lz = self.copy()
+        if isinstance(lz._obj, ChunkedArray):
+            offset = 0
+            chunks = []
+            for chunk in lz._obj.chunks:
+                size = len(chunk)
+                chunk_indices = list(filter(lambda x: offset <= x < size + offset, indices))
+                chunk_indices = array(map(lambda x: x - offset, chunk_indices))
+                if len(chunk_indices) > 0:
+                    chunks.append(chunk.take(chunk_indices))
+                offset += size
+            if len(chunks) > 0:
+                obj = concat_arrays(chunks)
+            else:
+                raise IndexError('ERROR: Out of range')
+        else:
+            indices = array(indices)
+            obj = lz._obj.take(indices)
+        lz._obj = obj
+        return lz
+
+    def filter(self, arr):
+        assert len(self) == len(arr)
+        lz = self.copy()
+        lz._obj = lz._obj.filter(arr)
         return lz
 
     def __repr__(self):
@@ -54,7 +83,7 @@ class LazyObj(object):
     def values(self):
         result = self._obj
         for i in range(self._counter):
-            result = self._function[i](result)
+            result = self._function[i](result, *self._args[i])
         return result
 
     def _head_and_tail_table(self, n=5, format='plain', to_wkt=True):
