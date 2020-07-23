@@ -104,7 +104,7 @@ def _export_table_from_df(df, geometry_col):
 
 def get_crs(layer):
     spatialRef = layer.GetSpatialRef()
-    crs = "%s:%s" % (spatialRef.GetAttrValue("AUTHORITY", 0), spatialRef.GetAttrValue("AUTHORITY", 1)) if spatialRef is not None else None
+    crs = spatialRef.ExportToWkt() if spatialRef is not None else None
     return crs
 
 def getDefinition(layer):
