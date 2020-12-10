@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="geovaex",
-    version="0.0.1",
+    version="0.0.2",
     author="Pantelis Mitropoulos",
     author_email="pmitropoulos@getmap.gr",
     description="Geospatial extension for vaex",
