@@ -68,4 +68,5 @@ def extract_unique_points(arr):
     return pg.extract_unique_points(from_wkb(arr))
 
 def within(arr, geometry):
+    geometry = pg.from_wkb(geometry)
     return pg.within(from_wkb(arr), geometry)

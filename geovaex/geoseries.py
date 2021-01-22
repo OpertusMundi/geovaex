@@ -224,10 +224,11 @@ class GeoSeries(object):
         else:
             return get_coordinates(self._active_geometry)
 
-    def _multiprocess(self, function, chunks, max_workers=None):
+    def _multiprocess(self, function, chunks, *args, **kwargs):
         result = []
+        max_workers = kwargs.pop('max_workers', None)
         executor = concurrent.futures.ProcessPoolExecutor(max_workers)
-        futures = [executor.submit(function, group) for group in chunks]
+        futures = [executor.submit(function, group, *args, **kwargs) for group in chunks]
         for f in concurrent.futures.as_completed(futures):
             result.append(f.result())
         return result
@@ -259,9 +260,10 @@ class GeoSeries(object):
 
     def within(self, geometry, chunksize=1000000, max_workers=None):
         chunks = self.chunked(chunksize)
+        geometry = pg.to_wkb(geometry)
         if len(chunks) == 1:
             return self._within_single(geometry)
-        pieces = self._multiprocess(within, chunks, max_workers=max_workers)
+        pieces = self._multiprocess(within, chunks, geometry, max_workers=max_workers)
         return np.concatenate(pieces)
 
     def to_numpy(self):
