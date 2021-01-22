@@ -1,6 +1,7 @@
 from .geoseries import GeoSeries
 from vaex.dataframe import DataFrameLocal
 import geovaex.io
+from .operations import constructive
 
 class GeoDataFrame(DataFrameLocal):
     def __init__(self, geometry, crs=None, path=None, metadata=None):
@@ -90,9 +91,8 @@ class GeoDataFrame(DataFrameLocal):
             return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull(), metadata=self._metadata)
 
     def centroid(self, inplace=False):
-        df = self if inplace else self.trim()
-        df._geoseries = df.geometry.centroid()
-        return df
+        """Remained only for backward compatibility. Replaced by constructive.centroid"""
+        return self.constructive.centroid()
 
     def within(self, geom, chunksize=1000000, max_workers=None):
         filt = self.geometry.within(geom, chunksize=chunksize, max_workers=max_workers)
@@ -115,3 +115,7 @@ class GeoDataFrame(DataFrameLocal):
 
     def to_file(self, output_file, driver=None):
         return geovaex.io.to_file(self, output_file, driver)
+
+    @property
+    def constructive(self):
+        return constructive.Constructive(self)

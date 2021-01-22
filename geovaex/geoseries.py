@@ -207,11 +207,6 @@ class GeoSeries(object):
         gs._geometry = convex_hull(gs._geometry)
         return gs
 
-    def centroid(self):
-        gs = self.trim()
-        gs._geometry = centroid(gs._active_geometry)
-        return gs
-
     def vertices(self):
         return extract_unique_points(self._active_geometry)
 
@@ -275,3 +270,8 @@ class GeoSeries(object):
         else:
             narray = self._active_geometry.to_numpy(zero_copy_only=False)
         return narray
+
+    def _constructive(self, operation, **kwargs):
+        gs = self.trim()
+        gs._geometry = constructive(gs._active_geometry, operation, **kwargs)
+        return gs
