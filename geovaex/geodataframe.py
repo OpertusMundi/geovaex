@@ -3,13 +3,18 @@ from vaex.dataframe import DataFrameLocal
 import geovaex.io
 
 class GeoDataFrame(DataFrameLocal):
-    def __init__(self, geometry, crs=None, path=None):
+    def __init__(self, geometry, crs=None, path=None, metadata=None):
         super(GeoDataFrame, self).__init__(name=path, path=path, column_names=[])
         self._geoseries = geometry if isinstance(geometry, GeoSeries) else GeoSeries(geometry, crs=crs, df=self)
+        self._metadata = metadata
 
     @property
     def geometry(self):
         return self._geoseries
+
+    @property
+    def metadata(self):
+        return {key.decode(): self._metadata[key].decode() for key in self._metadata} if self._metadata is not None else None
 
     def __str__(self):
         return self._head_and_tail_table(format='plain')
@@ -62,10 +67,10 @@ class GeoDataFrame(DataFrameLocal):
     def take(self, indices, filtered=True, dropfilter=True):
         df = self.trim()
         geometry = df.geometry.take(indices, filtered=filtered)
-        return geovaex.from_df(geometry=geometry, df=super(GeoDataFrame, self).take(indices, filtered=filtered, dropfilter=dropfilter))
+        return geovaex.from_df(geometry=geometry, df=super(GeoDataFrame, self).take(indices, filtered=filtered, dropfilter=dropfilter), metadata=self._metadata)
 
     def copy(self, column_names=None, virtual=True):
-        df = geovaex.from_df(df=self, geometry=self.geometry.copy())
+        df = geovaex.from_df(df=self, geometry=self.geometry.copy(), metadata=self._metadata)
         df.geometry._df = df
         return df
 
@@ -82,15 +87,15 @@ class GeoDataFrame(DataFrameLocal):
         if inplace:
             self._geoseries = self.geometry.convex_hull()
         else:
-            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull())
+            return geovaex.from_df(df=self.trim(), geometry=self.geometry.convex_hull(), metadata=self._metadata)
 
     def centroid(self, inplace=False):
         df = self if inplace else self.trim()
         df._geoseries = df.geometry.centroid()
         return df
 
-    def within(self, geom):
-        filt = self.geometry.within(geom, chunksize=1000000, max_workers=None)
+    def within(self, geom, chunksize=1000000, max_workers=None):
+        filt = self.geometry.within(geom, chunksize=chunksize, max_workers=max_workers)
         df = self.copy()
         df.add_column('tmp', filt, dtype=bool)
         df = df[df.tmp == True]
@@ -107,3 +112,6 @@ class GeoDataFrame(DataFrameLocal):
 
     def to_vaex_df(self):
         return super(GeoDataFrame, self).copy()
+
+    def to_file(self, output_file, driver=None):
+        return geovaex.io.to_file(self, output_file, driver)
