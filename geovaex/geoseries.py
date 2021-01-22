@@ -271,7 +271,7 @@ class GeoSeries(object):
             narray = self._active_geometry.to_numpy(zero_copy_only=False)
         return narray
 
-    def _constructive(self, operation, **kwargs):
+    def _constructive(self, operation, *args, **kwargs):
         gs = self.trim()
-        gs._geometry = constructive(gs._active_geometry, operation, **kwargs)
+        gs._geometry = constructive(gs._active_geometry, operation, *args, **kwargs)
         return gs
