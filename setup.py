@@ -1,11 +1,17 @@
 import setuptools
+import imp
+import os
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+dirname = os.path.dirname(__file__)
+path_version = os.path.join(dirname, "geovaex/_version.py")
+version = imp.load_source('version', path_version)
+
 setuptools.setup(
     name="geovaex",
-    version="0.0.2",
+    version=version.__version__,
     author="Pantelis Mitropoulos",
     author_email="pmitropoulos@getmap.gr",
     description="Geospatial extension for vaex",
@@ -14,7 +20,7 @@ setuptools.setup(
     url="https://github.com/OpertusMundi/geovaex.git",
     packages=setuptools.find_packages(),
     install_requires=[
-        'pygeos>=0.7.1,<0.7.2',
+        'pygeos>=0.7.1,<0.9.0',
         'pyarrow>=0.17.1,<0.17.2',
         'gdal>=3.0.2,<3.2.0',
         'numpy>=1.18.4,<1.18.5',
