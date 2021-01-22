@@ -3,19 +3,25 @@ try:
     from osgeo import ogr, gdal
 except:
     sys.exit('ERROR: cannot find GDAL/OGR modules')
-import geovaex.io
-import vaex
 import pyarrow as pa
-import pygeos as pg
 import numpy as np
 import collections
-from geovaex.geodataframe import GeoDataFrame
+from vaex import utils, superutils
 from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
+import geovaex.io
+from geovaex.geodataframe import GeoDataFrame
 from ._version import __version_tuple__, __version__
 
+
 def open(path):
+    """Opens an arrow spatial file.
+    Parameters:
+        path (string): The file's full path.
+    Returns:
+        (object) A GeoDataFrame object.
+    """
     source = pa.memory_map(path)
     try:
         # first we try if it opens as stream
@@ -30,45 +36,46 @@ def open(path):
         batches = reader  # this reader is iterable
     table = pa.Table.from_batches(batches)
     metadata = table.schema.metadata
-    if metadata:
-        print('Opened file %s, created by geovaex v.%s using GDAL driver %s.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
-    return _load_table(table)
-
-def _split_table(table, num_chunks):
-    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
-    for chunk in range(num_chunks):
-        pa_arrays = [table.column(entry.name).chunk(chunk) for entry in new_schema]
-        yield (pa.Table.from_arrays(pa_arrays, schema=new_schema), chunk)
-
-def _load_table(table):
-    try:
-        num_chunks = table.column('geometry').num_chunks
-    except:
-        raise Exception('ERROR: Geometry not found in file.')
-    # Geometry
-    geometry = table.column('geometry')
-    try:
-        crs = table.schema.field('geometry').metadata[b'crs'].decode()
-    except:
-        crs = None
-    # Vaex dataframe
-    if num_chunks > 1:
-        dataframes = [DatasetArrow(table=t) for t, chunk in _split_table(table, num_chunks)]
-        df = DataFrameConcatenated(dataframes)
-    else:
-        df = _create_df(table)
-    return from_df(df=df, geometry=geometry, crs=crs)
+    if metadata and b'geovaex version' in metadata.keys():
+        print('Opened file %s, created by geovaex v%s using %s driver.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
+    return from_arrow_spatial_table(table)
 
 
-def _create_df(table):
-    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
-    pa_arrays = [table.column(entry.name).chunk(0) for entry in new_schema]
-    t = pa.Table.from_arrays(pa_arrays, schema=new_schema)
-    df = DatasetArrow(table=t)
-    return df
+def read_file(path, convert=True, **kwargs):
+    """Reads a generic spatial file.
+    Parameters:
+        path (string): The spatial file full path.
+        convert (bool|string): Exports to arrow file when convert is a path. If True,
+            ``arrow_path = path+'.arrow'``.
+        **kwargs: Extra keyword arguments.
+    Returns:
+        (object) A GeoDataFrame object.
+    """
+    if convert == False:
+        table = pa.concat_tables(geovaex.io.to_arrow_table(path, **kwargs), promote=False)
+        return from_arrow_spatial_table(table)
 
-def from_df(df, geometry, crs=None):
-    copy = GeoDataFrame(geometry=geometry, crs=crs)
+    arrow_file = os.path.splitext(path)[0] + '.arrow' if convert == True else convert
+    to_arrow(path, arrow_file, **kwargs)
+    return open(arrow_file)
+
+
+def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
+    """ Alias to geovaex.io.to_arrow. """
+    return geovaex.io.to_arrow(file, arrow_file, chunksize=chunksize, crs=crs, **kwargs)
+
+
+def from_df(df, geometry, crs=None, metadata=None):
+    """Creates a GeoDataFrame from a vaex DataFrame
+    Parameters:
+        df (object): The vaex DataFrame.
+        geometry (object): A GeoSeries object or geometry column.
+        crs (string): The CRS of geometry (optional).
+        metadata (dict): GeoDataFrame metadata (optional).
+    Returns:
+        (object) A GeoDataFrame object.
+    """
+    copy = GeoDataFrame(geometry=geometry, crs=crs, metadata=metadata)
     copy._length_unfiltered = df._length_unfiltered
     copy._length_original = df._length_original
     copy._cached_filtered_length = df._cached_filtered_length
@@ -89,7 +96,7 @@ def from_df(df, geometry, crs=None):
             if key == '__filter__':
                 copy._selection_masks[key] = df._selection_masks[key]
             else:
-                copy._selection_masks[key] = vaex.superutils.Mask(copy._length_original)
+                copy._selection_masks[key] = superutils.Mask(copy._length_original)
             np.asarray(copy._selection_masks[key])[:] = np.asarray(df._selection_masks[key])
     for key, value in df.selection_history_indices.items():
         if df.get_selection(key):
@@ -114,7 +121,7 @@ def from_df(df, geometry, crs=None):
             #     depending.update(deps)
         else:
             real_column_name = copy._column_aliases.get(name, name)
-            valid_name = vaex.utils.find_valid_name(name)
+            valid_name = utils.find_valid_name(name)
             df.validate_expression(real_column_name)
             copy[valid_name] = copy._expr(real_column_name)
             deps = [key for key, value in copy._virtual_expressions[valid_name].ast_names.items()]
@@ -147,6 +154,61 @@ def from_df(df, geometry, crs=None):
 
     copy.copy_metadata(df)
     return copy
+
+
+def from_arrow_spatial_table(table):
+    """Constructs a GeoDataFrame using an arrow spatial table.
+    Parameters:
+        table (object): An arrow table.
+    Returns:
+        (object) The geovaex DataFrame.
+    """
+    try:
+        num_chunks = table.column('geometry').num_chunks
+    except:
+        raise Exception('ERROR: Geometry not found in file.')
+    # Geometry
+    geometry = table.column('geometry')
+    try:
+        crs = table.schema.field('geometry').metadata[b'crs'].decode()
+    except:
+        crs = None
+    # Vaex dataframe
+    if num_chunks > 1:
+        dataframes = [DatasetArrow(table=t) for t, chunk in _split_table(table, num_chunks)]
+        df = DataFrameConcatenated(dataframes)
+    else:
+        df = _create_df(table)
+    return from_df(df=df, geometry=geometry, crs=crs, metadata=table.schema.metadata)
+
+
+def _split_table(table, num_chunks):
+    """Splits an arrow table into chunks.
+    Parameters:
+        table (object): The arrow table.
+        num_chunks (int): The number of chunks.
+    Yields:
+        (object): The next arrow table chunk.
+    """
+    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
+    for chunk in range(num_chunks):
+        pa_arrays = [table.column(entry.name).chunk(chunk) for entry in new_schema]
+        yield (pa.Table.from_arrays(pa_arrays, schema=new_schema), chunk)
+
+
+def _create_df(table):
+    """Creates a vaex DataFrame from an arrow table.
+    Parameters:
+        table (object): The arrow table.
+    Returns:
+        (object) The vaex DataFrame.
+    """
+    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
+    pa_arrays = [table.column(entry.name).chunk(0) for entry in new_schema]
+    t = pa.Table.from_arrays(pa_arrays, schema=new_schema)
+    df = DatasetArrow(table=t)
+    return df
+
 
 def gdal_error_handler(err_class, err_num, err_msg):
     errtype = {
