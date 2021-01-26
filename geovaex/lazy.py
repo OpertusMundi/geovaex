@@ -7,15 +7,17 @@ class LazyObj(object):
         self._function = []
         self._obj = None
         self._args = []
+        self._kwargs = []
         self._counter = 0
 
     @classmethod
-    def init(cls, function, obj, *args):
+    def init(cls, function, obj, *args, **kwargs):
         lz = cls()
         assert isinstance(obj, (ChunkedArray, Array))
         lz._function.append(function)
         lz._obj = obj
         lz._args.append(args)
+        lz._kwargs.append(kwargs)
         lz._counter += 1
         return lz
 
@@ -24,13 +26,15 @@ class LazyObj(object):
         lz._function = [*self._function]
         lz._obj = self._obj
         lz._args = [*self._args]
+        lz._kwargs = [*self._kwargs]
         lz._counter = self._counter
         return lz
 
-    def add(self, function, *args):
+    def add(self, function, *args, **kwargs):
         lz = self.copy()
         lz._function.append(function)
         lz._args.append(args)
+        lz._kwargs.append(kwargs)
         lz._counter += 1
         return lz
 
@@ -123,7 +127,7 @@ class Lazy(object):
     def __init__(self, function):
         self._function = function
 
-    def __call__(self, obj, *args):
+    def __call__(self, obj, *args, **kwargs):
         if isinstance(obj, LazyObj):
-            return obj.add(self._function, *args)
-        return LazyObj.init(self._function, obj, *args)
+            return obj.add(self._function, *args, **kwargs)
+        return LazyObj.init(self._function, obj, *args, **kwargs)
