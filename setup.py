@@ -20,7 +20,7 @@ setuptools.setup(
     url="https://github.com/OpertusMundi/geovaex.git",
     packages=setuptools.find_packages(),
     install_requires=[
-        'pygeos>=0.7.1,<0.9.0',
+        'pygeos>=0.8.0,<0.9.0',
         'pyarrow>=0.17.1,<0.17.2',
         'gdal>=3.0.2,<3.2.0',
         'numpy>=1.18.4,<1.18.5',
