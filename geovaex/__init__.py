@@ -6,13 +6,20 @@ except:
 import pyarrow as pa
 import numpy as np
 import collections
-from vaex import utils, superutils
+from vaex import utils, superutils, from_arrow_table
 from vaex.dataframe import DataFrameConcatenated
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
 import geovaex.io
 from geovaex.geodataframe import GeoDataFrame
+import warnings
 from ._version import __version_tuple__, __version__
+
+
+def custom_formatwarning(msg, *args, **kwargs):
+    """Ignore everything except the message."""
+    return str(msg) + '\n'
+warnings.formatwarning = custom_formatwarning
 
 
 def open(path):
@@ -35,10 +42,14 @@ def open(path):
         # if a stream, we're good
         batches = reader  # this reader is iterable
     table = pa.Table.from_batches(batches)
-    metadata = table.schema.metadata
-    if metadata and b'geovaex version' in metadata.keys():
+    if table.schema.metadata is not None and b'geovaex version' in table.schema.metadata.keys():
+        metadata = table.schema.metadata
         print('Opened file %s, created by geovaex v%s using %s driver.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
-    return from_arrow_spatial_table(table)
+        df = from_arrow_spatial_table(table)
+    else:
+        warnings.warn('Not a spatial arrow file. Returning a Vaex DataFrame.')
+        df = from_arrow_table(table).copy()
+    return df
 
 
 def read_file(path, convert=True, **kwargs):
@@ -53,7 +64,12 @@ def read_file(path, convert=True, **kwargs):
     """
     if convert == False:
         table = pa.concat_tables(geovaex.io.to_arrow_table(path, **kwargs), promote=False)
-        return from_arrow_spatial_table(table)
+        if table.schema.metadata is not None and b'geovaex version' in table.schema.metadata.keys():
+            df = from_arrow_spatial_table(table)
+        else:
+            warnings.warn('Not a spatial file. Returning a Vaex DataFrame.')
+            df = from_arrow_table(table).copy()
+        return df
 
     arrow_file = os.path.splitext(path)[0] + '.arrow' if convert == True else convert
     to_arrow(path, arrow_file, **kwargs)

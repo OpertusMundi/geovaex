@@ -108,11 +108,15 @@ def _csv_to_table(file, metadata=None, lat=None, lon=None, geom='wkt', crs=None,
             eof = True
         else:
             table = pa.Table.from_batches([batch])
-            if type_of_geom == 'latlon':
-                table = _geometry_from_latlon(table, lat, lon, crs=crs)
+            try:
+                if type_of_geom == 'latlon':
+                    table = _geometry_from_latlon(table, lat, lon, crs=crs)
+                else:
+                    table = _geometry_from_wkt(table, geom, crs=crs)
+            except KeyError:
+                pass
             else:
-                table = _geometry_from_wkt(table, geom, crs=crs)
-            table = table.replace_schema_metadata(metadata=metadata)
+                table = table.replace_schema_metadata(metadata=metadata)
             yield table
 
 
