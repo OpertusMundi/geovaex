@@ -136,40 +136,107 @@ def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
     sink.close()
 
 
-def to_file(gdf, output_file, driver):
+def to_file(gdf, path, column_names=None, selection=False, virtual=True, chunksize=2000000):
+    """Saves GeoDataFrame to a file.
+    Parameters:
+        path (string): The full path of the output file.
+        column_names (list): List of column names to wrtie or None for all columns.
+        selection (bool): Write selection or not
+        virtual (bool): When True, write virtual columns.
+        chunksize (int): Chunk size for each write
+    """
+    metadata = {'source file': '-', 'driver': 'builtin', 'geovaex version': __version__}
+    with pa.OSFile(path, 'wb') as sink:
+        writer = None
+        for i1, i2, table in gdf.to_arrow_table(column_names=column_names, selection=selection, virtual=virtual, chunk_size=chunksize):
+            table = table.replace_schema_metadata(metadata=metadata)
+            b = table.to_batches()
+            if writer is None:
+                writer = pa.RecordBatchStreamWriter(sink, b[0].schema)
+            writer.write_table(table)
+    sink.close()
+
+
+def export_csv(gdf, path, latlon=False, geom=True, lat_name='lat', lon_name='lot', geom_name='geometry', column_names=None, selection=False, virtual=True, chunksize=1000000, **kwargs):
+    """ Writes GeoDataFrame to a CSV spatial file.
+    """
+    import pandas as pd
+
+    column_names = column_names or gdf.get_column_names(virtual=virtual, strings=True)
+    dtypes = gdf[column_names].dtypes
+    fields = column_names[:]
+    if latlon:
+        fields.append(lat_name)
+        fields.append(lon_name)
+    if geom:
+        fields.append(geom_name)
+
+    geom_arr = gdf.geometry._geometry
+    if selection not in [None, False] or gdf.filtered:
+        mask = gdf.evaluate_selection_mask(selection)
+        geom_arr = geom_arr.filter(mask)
+
+    for i1, i2, chunks in gdf.evaluate_iterator(column_names, chunk_size=chunksize, selection=selection):
+        if latlon:
+            coordinates = pg.get_coordinates(pg.centroid(pg.from_wkb(geom_arr[i1:i2]))).T
+            chunks.append(coordinates[0])
+            chunks.append(coordinates[1])
+        if geom:
+            chunks.append(pg.to_wkt(pg.from_wkb(geom_arr[i1:i2])))
+        chunk_dict = {col: values for col, values in zip(fields, chunks)}
+        chunk_pdf = pd.DataFrame(chunk_dict)
+
+        if i1 == 0:  # Only the 1st chunk should have a header and the rest will be appended
+            mode = 'w'
+            header = True
+        else:
+            mode = 'a'
+            header = False
+
+        chunk_pdf.to_csv(path_or_buf=path, mode=mode, header=header, index=False, **kwargs)
+
+
+def export_spatial(gdf, path, driver, column_names=None, selection=False, virtual=True):
     """ Writes a GeoDataFrame into a spatial file.
     Parameters:
         gdf (object): A GeoVaex DataFrame.
-        output_file (string): The full path of the output file.
+        path (string): The full path of the output file.
         driver (string): The driver to be used to convert the DataFrame into a spatial file.
+        column_names (list): List of column names to export or None for all columns.
+        selection (bool): Export selection or not
+        virtual (bool): When True, export virtual columns.
     """
     geometric_types = [ogr.wkbPoint, ogr.wkbLineString, ogr.wkbLinearRing, ogr.wkbPolygon, ogr.wkbMultiPoint, ogr.wkbMultiLineString, ogr.wkbMultiPolygon, ogr.wkbGeometryCollection]
     field_types = {'int': ogr.OFTInteger64, 'str': ogr.OFTString, 'flo': ogr.OFTReal}
     driver = ogr.GetDriverByName(driver) if driver is not None else ogr.GetDriverByName(gdf.metadata['driver'])
     if driver is None:
-        raise Exception('ERROR: Driver not supported')
-    ds = driver.CreateDataSource(output_file)
+        raise Exception('ERROR: Driver not supported.')
+    ds = driver.CreateDataSource(path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(gdf.geometry.crs.to_epsg())
     geometries = gdf.geometry.to_pygeos()
-    types = np.unique(pg.get_type_id(geometries))
+    types = np.unique(pg.get_type_id(gdf.geometry[0:1000]))
     if (len(types) != 1):
         raise Exception('ERROR: Could not write multiple geometries to %s.' % (driver))
-    layer = ds.CreateLayer(gdf.metadata['layer'], srs, geometric_types[types[0]])
+    try:
+        layer = ds.CreateLayer(gdf.metadata['layer'], srs, geometric_types[types[0]])
+    except KeyError:
+        layer = ds.CreateLayer((os.path.splitext(path)[1]).split('.')[0], srs, geometric_types[types[0]])
     if layer is None:
-        raise Exception('ERROR: Unexpexted error, check file extension to be compatible with driver.')
-    fields = _get_datatypes(gdf)
+        raise Exception('ERROR: Cannot write layer, file extension not consistent with driver, or geometric type incompatible with driver.')
+    fields = _get_datatypes(gdf, column_names=column_names)
     for field_name in fields:
         field = ogr.FieldDefn(field_name, field_types[fields[field_name][0:3]])
         if fields[field_name] == 'str':
             field.SetWidth(1023)
         layer.CreateField(field)
+    items = gdf.to_dict()
     for i in range(len(gdf)):
-        row = gdf[i]
         feature = ogr.Feature(layer.GetLayerDefn())
-        for idx, field in enumerate([*fields]):
-            feature.SetField(field, row[idx].item() if hasattr(row[idx], 'item') else row[idx])
-        geometry = ogr.CreateGeometryFromWkb(pg.to_wkb(row[len(row) - 1]))
+        for field in fields:
+            feature.SetField(field, items[field][i])
+        geometry = gdf.geometry._geometry[i]
+        geometry = ogr.CreateGeometryFromWkb(geometry.as_py() if isinstance(geometry, pa.lib.BinaryValue) else geometry)
         feature.SetGeometry(geometry)
         layer.CreateFeature(feature)
         feature = None
@@ -263,14 +330,17 @@ def _convert_options_from_dict(**kwargs):
     )
 
 
-def _get_datatypes(gdf):
+def _get_datatypes(gdf, column_names=None, virtual=False):
     """Retrieves the datatypes of a GeoDataFrame.
     Parameters:
         gdf (object): The GeoDataFrame object.
+        column_names (list): List of column or None for all columns.
+        virtual (bool): When True, include virtual columns.
     Returns:
         (dict) A column names - datatype dictionary.
     """
-    datatypes = {col: gdf.data_type(col) for col in gdf.get_column_names(virtual=False)}
+    column_names = column_names or gdf.get_column_names(virtual=virtual, strings=True)
+    datatypes = {col: gdf.data_type(col) for col in column_names}
     for col in datatypes:
         try:
             datatypes[col] = datatypes[col].__name__
@@ -325,8 +395,6 @@ def _export_table_from_df(df, geometry_col):
     Returns:
         (object): An arrow spatial table.
     """
-    import pyarrow as pa
-    import pygeos as pg
     column_names = df.get_column_names(strings=True)
     arrow_arrays = []
 
