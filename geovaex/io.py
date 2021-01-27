@@ -43,7 +43,7 @@ def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='
             if dataSource is None:
                 raise FileNotFoundError('ERROR: Could not open %s.' % (file))
             print('Opened file %s, using driver %s.' % (filename, dataSource.GetDriver().name))
-            for table in _datasource_to_table(dataSource, chunksize=chunksize, crs=crs):
+            for table in _datasource_to_table(dataSource, metadata=metadata, chunksize=chunksize, crs=crs):
                 yield table
 
 
