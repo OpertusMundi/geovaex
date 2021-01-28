@@ -179,6 +179,8 @@ class GeoDataFrame(DataFrameLocal):
         """
         if path.endswith('.csv'):
             driver = 'CSV'
+        elif path.endswith('.tsv'):
+            driver = 'TSV'
         if driver is not None:
             self.export_spatial(path, driver=driver, **kwargs)
         else:
@@ -188,8 +190,11 @@ class GeoDataFrame(DataFrameLocal):
                 self.export_spatial(path, **kwargs)
 
     def export_spatial(self, path, driver=None, **kwargs):
-        if driver == 'CSV' or driver == 'csv':
-            geovaex.io.export_csv(self, path, **kwargs)
+        if driver.lower() == 'csv' or driver.lower() == 'tsv':
+            delimiter = kwargs.pop('delimiter', ',')
+            if driver.lower() == 'tsv':
+                delimiter = "\t"
+            geovaex.io.export_csv(self, path, delimiter=delimiter, **kwargs)
         else:
             geovaex.io.export_spatial(self, path, driver=driver, **kwargs)
 

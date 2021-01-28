@@ -32,10 +32,14 @@ def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='
     except:
         print(sys.exc_info()[1])
     else:
-        driver = dataSource.GetDriver().name if dataSource is not None else (os.path.splitext(file)[1]).split('.')[1].upper()
+        extension = (os.path.splitext(file)[1]).split('.')[1]
+        driver = dataSource.GetDriver().name if dataSource is not None else extension.upper()
         metadata = {'source file': filename, 'driver': driver, 'geovaex version': __version__}
-        if driver == 'CSV':
-            for table in _csv_to_table(file, metadata=metadata, lat=lat, lon=lon, geom=geom, crs=crs, **kwargs):
+        if driver == 'CSV' or driver == 'TSV':
+            delimiter = kwargs.pop('delimiter', ',')
+            if extension.lower() == 'tsv':
+                delimiter = "\t"
+            for table in _csv_to_table(file, metadata=metadata, lat=lat, lon=lon, geom=geom, crs=crs, delimiter=delimiter, **kwargs):
                 yield table
         elif driver == 'netCDF':
             raise Exception('NetCDF files are not yet supported by geovaex.')
