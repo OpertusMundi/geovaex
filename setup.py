@@ -21,7 +21,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'pygeos>=0.8.0,<0.9.0',
-        'pyarrow>=0.17.1,<0.17.2',
+        'pyarrow>=3.0.0,<3.0.1',
         'gdal>=3.0.2,<3.2.0',
         'numpy>=1.18.4,<1.18.5',
         'vaex>=3.0.0,<3.0.1',
