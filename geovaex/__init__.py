@@ -219,7 +219,8 @@ def _create_df(table):
     Returns:
         (object) The vaex DataFrame.
     """
-    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
+    # TODO Better way to handle NULL types
+    new_schema = pa.schema([s for s in table.schema if s.name != 'geometry' and s.type.id != 0])
     pa_arrays = [table.column(entry.name).chunk(0) for entry in new_schema]
     t = pa.Table.from_arrays(pa_arrays, schema=new_schema)
     df = DatasetArrow(table=t)

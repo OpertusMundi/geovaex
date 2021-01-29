@@ -32,7 +32,8 @@ def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='
     except:
         print(sys.exc_info()[1])
     else:
-        extension = (os.path.splitext(file)[1]).split('.')[1]
+        extension = (os.path.splitext(file)[1]).split('.')
+        extension = extension[len(extension) - 1]
         driver = dataSource.GetDriver().name if dataSource is not None else extension.upper()
         metadata = {'source file': filename, 'driver': driver, 'geovaex version': __version__}
         if driver == 'CSV' or driver == 'TSV':
@@ -330,7 +331,7 @@ def _convert_options_from_dict(**kwargs):
         null_values=kwargs.pop('null_values', None),
         true_values=kwargs.pop('true_values', None),
         false_values=kwargs.pop('false_values', None),
-        strings_can_be_null=kwargs.pop('strings_can_be_null', None),
+        strings_can_be_null=kwargs.pop('strings_can_be_null', True),
         auto_dict_encode=kwargs.pop('auto_dict_encode', None),
         auto_dict_max_cardinality=kwargs.pop('auto_dict_max_cardinality', None),
         include_columns=kwargs.pop('include_columns', None),
