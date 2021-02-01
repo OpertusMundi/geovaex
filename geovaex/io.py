@@ -328,7 +328,7 @@ def _convert_options_from_dict(**kwargs):
     return csv.ConvertOptions(
         check_utf8=kwargs.pop('check_utf8', True),
         column_types=kwargs.pop('column_types', None),
-        null_values=kwargs.pop('null_values', None),
+        null_values=kwargs.pop('null_values', [" "]),
         true_values=kwargs.pop('true_values', None),
         false_values=kwargs.pop('false_values', None),
         strings_can_be_null=kwargs.pop('strings_can_be_null', True),
