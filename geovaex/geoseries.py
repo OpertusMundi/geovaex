@@ -236,7 +236,7 @@ class GeoSeries(object):
         if len(chunks) == 1:
             return self._total_bounds_single()
         bounds = self._multiprocess(total_bounds, chunks, max_workers=max_workers)
-        bounds = GeoSeries(pa.array(bounds), crs=self._crs, df=self._df)
+        bounds = GeoSeries(pa.array(bounds), crs=self._crs, df=None)
         return bounds.total_bounds(chunksize=chunksize, max_workers=max_workers)
 
     def _convex_hull_all_single(self):
@@ -247,7 +247,7 @@ class GeoSeries(object):
         if len(chunks) == 1:
             return self._convex_hull_all_single()
         hulls = self._multiprocess(convex_hull_all, chunks, max_workers=max_workers)
-        hulls = GeoSeries(pa.array(hulls), crs=self._crs, df=self._df)
+        hulls = GeoSeries(pa.array(hulls), crs=self._crs, df=None)
         return hulls.convex_hull_all(chunksize=chunksize, max_workers=max_workers)
 
     def _within_single(self, geometry):
