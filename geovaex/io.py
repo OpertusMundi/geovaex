@@ -171,6 +171,8 @@ def export_csv(gdf, path, latlon=False, geom=True, lat_name='lat', lon_name='lot
     """
     import pandas as pd
 
+    sep = kwargs.pop('delimiter', ',')
+
     column_names = column_names or gdf.get_column_names(virtual=virtual, strings=True)
     dtypes = gdf[column_names].dtypes
     fields = column_names[:]
@@ -202,10 +204,10 @@ def export_csv(gdf, path, latlon=False, geom=True, lat_name='lat', lon_name='lot
             mode = 'a'
             header = False
 
-        chunk_pdf.to_csv(path_or_buf=path, mode=mode, header=header, index=False, **kwargs)
+        chunk_pdf.to_csv(path_or_buf=path, mode=mode, header=header, sep=sep, index=False, **kwargs)
 
 
-def export_spatial(gdf, path, driver, column_names=None, selection=False, virtual=True):
+def export_spatial(gdf, path, driver=None, column_names=None, selection=False, virtual=True, chunksize=1000000):
     """ Writes a GeoDataFrame into a spatial file.
     Parameters:
         gdf (object): A GeoVaex DataFrame.
@@ -223,8 +225,14 @@ def export_spatial(gdf, path, driver, column_names=None, selection=False, virtua
     ds = driver.CreateDataSource(path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(gdf.geometry.crs.to_epsg())
-    geometries = gdf.geometry.to_pygeos()
     types = np.unique(pg.get_type_id(gdf.geometry[0:1000]))
+    if len(types) == 2:
+        if 0 in types and 4 in types:
+            types = [4]
+        elif 1 in types and 5 in types:
+            types = [5]
+        elif 3 in types and 6 in types:
+            types = [6]
     if (len(types) != 1):
         raise Exception('ERROR: Could not write multiple geometries to %s.' % (driver))
     try:
@@ -233,22 +241,34 @@ def export_spatial(gdf, path, driver, column_names=None, selection=False, virtua
         layer = ds.CreateLayer((os.path.splitext(path)[1]).split('.')[0], srs, geometric_types[types[0]])
     if layer is None:
         raise Exception('ERROR: Cannot write layer, file extension not consistent with driver, or geometric type incompatible with driver.')
-    fields = _get_datatypes(gdf, column_names=column_names)
+    fields = _get_datatypes(gdf, column_names=column_names, virtual=virtual)
     for field_name in fields:
         field = ogr.FieldDefn(field_name, field_types[fields[field_name][0:3]])
         if fields[field_name] == 'str':
             field.SetWidth(1023)
         layer.CreateField(field)
-    items = gdf.to_dict()
-    for i in range(len(gdf)):
-        feature = ogr.Feature(layer.GetLayerDefn())
-        for field in fields:
-            feature.SetField(field, items[field][i])
-        geometry = gdf.geometry._geometry[i]
-        geometry = ogr.CreateGeometryFromWkb(geometry.as_py() if isinstance(geometry, pa.lib.BinaryValue) else geometry)
-        feature.SetGeometry(geometry)
-        layer.CreateFeature(feature)
-        feature = None
+
+    geom_arr = gdf.geometry._geometry
+    if selection not in [None, False] or gdf.filtered:
+        mask = gdf.evaluate_selection_mask(selection)
+        geom_arr = geom_arr.filter(mask)
+
+    for i1, i2, chunk in gdf.evaluate_iterator(list(fields.keys()), selection=selection, chunk_size=chunksize):
+        geom_chunk = geom_arr[i1:i2]
+        for i in range(len(chunk[0])):
+            feature = ogr.Feature(layer.GetLayerDefn())
+            for field_i, field in enumerate(fields):
+                value = chunk[field_i][i]
+                try:
+                    converted_value = value.item()
+                except AttributeError:
+                    converted_value = value
+                feature.SetField(field, converted_value)
+            geometry = geom_chunk[i]
+            geometry = ogr.CreateGeometryFromWkb(geometry.as_py() if isinstance(geometry, pa.lib.BinaryScalar) else geometry)
+            feature.SetGeometry(geometry)
+            layer.CreateFeature(feature)
+            feature = None
     ds = None
 
 

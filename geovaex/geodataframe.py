@@ -177,12 +177,13 @@ class GeoDataFrame(DataFrameLocal):
             selection (bool): Export selection or not
             virtual (bool): When True, export virtual columns.
         """
+        chunksize = kwargs.pop('chunksize', 1000000)
         if path.endswith('.csv'):
             driver = 'CSV'
         elif path.endswith('.tsv'):
             driver = 'TSV'
         if driver is not None:
-            self.export_spatial(path, driver=driver, **kwargs)
+            self.export_spatial(path, driver=driver, chunksize=chunksize, **kwargs)
         else:
             try:
                 super(GeoDataFrame, self).export(path, **kwargs)
