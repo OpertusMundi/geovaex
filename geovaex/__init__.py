@@ -106,7 +106,7 @@ def from_df(df, geometry, crs=None, metadata=None, column_names=None, virtual=Tr
         column_names = df.get_column_names(hidden=True, alias=False)
         copy._column_aliases = dict(df._column_aliases)
     else:
-        copy._column_aliases = {alias: real_name for alias, real_name in self._column_aliases.items()}
+        copy._column_aliases = {alias: real_name for alias, real_name in copy._column_aliases.items()}
         column_names = [df._column_aliases.get(k, k) for k in column_names]
     copy._column_aliases = dict(df._column_aliases)
 
