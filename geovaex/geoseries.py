@@ -90,7 +90,7 @@ class GeoSeries(object):
         gs._length_original = self._length_original
         gs._length_unfiltered = self._length_unfiltered
         gs._index_end = self._index_end
-        gs._df = self._df
+        gs._df = df if df is not None else self._df
         return gs
 
     def trim(self, inplace=False):

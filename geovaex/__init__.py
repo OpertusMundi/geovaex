@@ -81,7 +81,7 @@ def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
     return geovaex.io.to_arrow(file, arrow_file, chunksize=chunksize, crs=crs, **kwargs)
 
 
-def from_df(df, geometry, crs=None, metadata=None):
+def from_df(df, geometry, crs=None, metadata=None, column_names=None, virtual=True):
     """Creates a GeoDataFrame from a vaex DataFrame
     Parameters:
         df (object): The vaex DataFrame.
@@ -102,7 +102,12 @@ def from_df(df, geometry, crs=None, metadata=None):
     copy.units.update(df.units)
     copy.variables.update(df.variables)  # we add all, could maybe only copy used
     copy._categories.update(df._categories)
-    column_names = df.get_column_names(hidden=True, alias=False)
+    if column_names is None:
+        column_names = df.get_column_names(hidden=True, alias=False)
+        copy._column_aliases = dict(df._column_aliases)
+    else:
+        copy._column_aliases = {alias: real_name for alias, real_name in self._column_aliases.items()}
+        column_names = [df._column_aliases.get(k, k) for k in column_names]
     copy._column_aliases = dict(df._column_aliases)
 
     copy.functions.update(df.functions)
@@ -130,11 +135,10 @@ def from_df(df, geometry, crs=None, metadata=None):
             if isinstance(column, ColumnSparse):
                 copy._sparse_matrices[name] = df._sparse_matrices[name]
         elif name in df.virtual_columns:
-            pass
-            # if virtual:
-            #     copy.add_virtual_column(name, df.virtual_columns[name])
-            #     deps = [key for key, value in copy._virtual_expressions[name].ast_names.items()]
-            #     depending.update(deps)
+            if virtual:
+                copy.add_virtual_column(name, df.virtual_columns[name])
+                deps = [key for key, value in copy._virtual_expressions[name].ast_names.items()]
+                depending.update(deps)
         else:
             real_column_name = copy._column_aliases.get(name, name)
             valid_name = utils.find_valid_name(name)

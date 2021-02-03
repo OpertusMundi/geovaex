@@ -74,7 +74,7 @@ class GeoDataFrame(DataFrameLocal):
         return geovaex.from_df(geometry=geometry, df=super(GeoDataFrame, self).take(indices, filtered=filtered, dropfilter=dropfilter), metadata=self._metadata)
 
     def copy(self, column_names=None, virtual=True):
-        df = geovaex.from_df(df=self, geometry=self.geometry.copy(), metadata=self._metadata)
+        df = geovaex.from_df(df=self, geometry=self.geometry.copy(), metadata=self._metadata, column_names=column_names, virtual=virtual)
         df.geometry._df = df
         return df
 
