@@ -243,7 +243,8 @@ def export_spatial(gdf, path, driver=None, column_names=None, selection=False, v
         raise Exception('ERROR: Cannot write layer, file extension not consistent with driver, or geometric type incompatible with driver.')
     fields = _get_datatypes(gdf, column_names=column_names, virtual=virtual)
     for field_name in fields:
-        field = ogr.FieldDefn(field_name, field_types[fields[field_name][0:3]])
+        key = 'str' if fields[field_name] == 'object' else fields[field_name][0:3]
+        field = ogr.FieldDefn(field_name, field_types[key])
         if fields[field_name] == 'str':
             field.SetWidth(1023)
         layer.CreateField(field)
