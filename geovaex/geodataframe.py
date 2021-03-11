@@ -216,6 +216,31 @@ class GeoDataFrame(DataFrameLocal):
     def constructive(self):
         return constructive.Constructive(self)
 
+    def sjoin(self, other, how='left', op='within', distance=None, lprefix='', rprefix='', lsuffix='', rsuffix='', allow_duplication=True):
+        """Spatial join.
+
+        Joins to another GeoDataFrames on a spatial predicate.
+
+        Arguments:
+            other (GeoDataFrame): The other GeoDataFrame (right).
+
+        Keyword Arguments:
+            how (str): how to join, 'left' keeps all rows on the left, and adds columns (with possible missing values)
+                'right' is similar with self and other swapped. 'inner' will only return rows which overlap. (default: {'left'})
+            op (str): The spatial predicate operation (one of "contains", "within", "intersects", "dwithin"; default: {"within"})
+            distance (float): For op="dwithin", the minimum distance between the two geometries (required for 'dwithin'; ignored for other operations; default: {None})
+            lprefix (str): prefix to add to the left column names in case of a name collision (default: {''})
+            rprefix (str): similar for the right (default: {''})
+            lsuffix (str): suffix to add to the left column names in case of a name collision (default: {''})
+            rsuffix (str): similar for the right (default: {''})
+            allow_duplication (bool): Allow duplication of rows when the joined column contains non-unique values. (default: {True})
+
+        Returns:
+            [type] -- [description]
+        """
+        from .sjoin import sjoin
+        return sjoin(self, other, how=how, op=op, **kwargs)
+
     def concat(self, other):
         df = super(GeoDataFrame, self).concat(other)
         geometry = np.concatenate((self.geometry.to_numpy(), other.geometry.to_numpy()))
