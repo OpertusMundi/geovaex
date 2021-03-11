@@ -1,5 +1,5 @@
 import setuptools
-import imp
+from importlib.machinery import SourceFileLoader
 import os
 
 with open("README.md", "r") as fh:
@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 dirname = os.path.dirname(__file__)
 path_version = os.path.join(dirname, "geovaex/_version.py")
-version = imp.load_source('version', path_version)
+version = SourceFileLoader('version', path_version).load_module()
 
 setuptools.setup(
     name="geovaex",
@@ -20,7 +20,7 @@ setuptools.setup(
     url="https://github.com/OpertusMundi/geovaex.git",
     packages=setuptools.find_packages(),
     install_requires=[
-        'pygeos>=0.8.0,<0.9.0',
+        'pygeos>=0.8.0,<1.0.0',
         'pyarrow>=3.0.0,<3.0.1',
         'gdal>=3.0.2,<3.2.0',
         'numpy>=1.18.4,<1.18.5',
