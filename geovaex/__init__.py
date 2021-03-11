@@ -14,6 +14,7 @@ import geovaex.io
 from geovaex.geodataframe import GeoDataFrame
 import warnings
 from ._version import __version_tuple__, __version__
+from .patch import *
 
 
 def custom_formatwarning(msg, *args, **kwargs):
