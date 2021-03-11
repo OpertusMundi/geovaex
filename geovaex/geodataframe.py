@@ -1,7 +1,7 @@
 from .geoseries import GeoSeries
 from vaex.dataframe import DataFrameLocal
 import geovaex.io
-from .operations import constructive
+from .operations import constructive, predicates
 import pyarrow as pa
 import numpy as np
 
@@ -67,6 +67,12 @@ class GeoDataFrame(DataFrameLocal):
             row = super(GeoDataFrame, self).__getitem__(item)
             row.append(self.geometry[item])
             return row
+        if isinstance(item, predicates.PredicateFilters):
+            df = self.copy()
+            df.add_column(item.name, item.filter, dtype=bool)
+            df = df[(df[item.name] == True)]
+            df.drop(item.name, inplace=True)
+            return df
         return super(GeoDataFrame, self).__getitem__(item)
 
     def take(self, indices, filtered=True, dropfilter=True):
@@ -215,6 +221,10 @@ class GeoDataFrame(DataFrameLocal):
     @property
     def constructive(self):
         return constructive.Constructive(self)
+
+    @property
+    def predicates(self):
+        return predicates.Predicates(self)
 
     def sjoin(self, other, how='left', op='within', distance=None, lprefix='', rprefix='', lsuffix='', rsuffix='', allow_duplication=True):
         """Spatial join.
