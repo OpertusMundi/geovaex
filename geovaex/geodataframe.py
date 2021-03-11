@@ -3,10 +3,11 @@ from vaex.dataframe import DataFrameLocal
 import geovaex.io
 from .operations import constructive
 import pyarrow as pa
+import numpy as np
 
 class GeoDataFrame(DataFrameLocal):
-    def __init__(self, geometry, crs=None, path=None, metadata=None):
-        super(GeoDataFrame, self).__init__(name=path, path=path, column_names=[])
+    def __init__(self, geometry, crs=None, path='geodataframe', metadata=None, column_names=None):
+        super(GeoDataFrame, self).__init__(name=path, path=path, column_names=column_names or [])
         self._geoseries = geometry if isinstance(geometry, GeoSeries) else GeoSeries(geometry, crs=crs, df=self)
         self._metadata = metadata
 
@@ -74,6 +75,15 @@ class GeoDataFrame(DataFrameLocal):
         return geovaex.from_df(geometry=geometry, df=super(GeoDataFrame, self).take(indices, filtered=filtered, dropfilter=dropfilter), metadata=self._metadata)
 
     def copy(self, column_names=None, virtual=True):
+        """Creates a new DataFrame, copy of this one.
+
+        Keyword Arguments:
+            column_names (list): A list with the column names to copy. If None, all will be copied (default: {None})
+            virtual (bool): If True, copies also the virtual columns (default: {True})
+
+        Returns:
+            (GeoDataFrame): The copy of the DataFrame.
+        """
         df = geovaex.from_df(df=self, geometry=self.geometry.copy(), metadata=self._metadata, column_names=column_names, virtual=virtual)
         df.geometry._df = df
         return df
@@ -205,3 +215,32 @@ class GeoDataFrame(DataFrameLocal):
     @property
     def constructive(self):
         return constructive.Constructive(self)
+
+    def concat(self, other):
+        df = super(GeoDataFrame, self).concat(other)
+        geometry = np.concatenate((self.geometry.to_numpy(), other.geometry.to_numpy()))
+        return geovaex.from_df(geometry=pa.array(geometry), df=df, metadata=self._metadata, crs=self.geometry._crs)
+
+    def shallow_copy(self, virtual=True, variables=True):
+        """Creates a (shallow) copy of the DataFrame.
+
+        It will link to the same data, but will have its own state, e.g. virtual columns, variables, selection etc.
+
+        """
+        df = GeoDataFrame(self.geometry, crs=self.geometry.crs, path=self.path, metadata=self.metadata, column_names=self.column_names)
+        df.columns.update(self.columns)
+        df._length_unfiltered = self._length_unfiltered
+        df._length_original = self._length_original
+        df._index_end = self._index_end
+        df._index_start = self._index_start
+        df._active_fraction = self._active_fraction
+        if virtual:
+            df.virtual_columns.update(self.virtual_columns)
+        if variables:
+            df.variables.update(self.variables)
+        # half shallow/deep copy
+        # for key, value in self.selection_histories.items():
+        # df.selection_histories[key] = list(value)
+        # for key, value in self.selection_history_indices.items():
+        # df.selection_history_indices[key] = value
+        return df

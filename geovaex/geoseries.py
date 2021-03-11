@@ -222,7 +222,7 @@ class GeoSeries(object):
     def _multiprocess(self, function, chunks, *args, **kwargs):
         result = []
         max_workers = kwargs.pop('max_workers', None)
-        executor = concurrent.futures.ProcessPoolExecutor(max_workers)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers)
         futures = [executor.submit(function, group, *args, **kwargs) for group in chunks]
         for f in concurrent.futures.as_completed(futures):
             result.append(f.result())
@@ -262,12 +262,9 @@ class GeoSeries(object):
         return np.concatenate(pieces)
 
     def to_numpy(self):
-        if isinstance(self._active_geometry, LazyObj):
-            narray = np.array(self._active_geometry.values())
-        elif isinstance(self._active_geometry, pa.ChunkedArray):
-            chunks = [chunk.to_numpy(zero_copy_only=False) for chunk in self._active_geometry.chunks]
-            narray = np.concatenate(chunks)
-        else:
+        try:
+            narray = self._active_geometry.to_numpy()
+        except pa.lib.ArrowInvalid:
             narray = self._active_geometry.to_numpy(zero_copy_only=False)
         return narray
 

@@ -12,7 +12,7 @@ class Constructive():
     def _geometry_constructive(self, operation, *args, inplace=False, **kwargs):
         """Performs various constructive operations over geometries.
         Parameters:
-            operation (sting): The name of the constructive operation.
+            operation (string): The name of the constructive operation.
             *args: Extra arguments required by the operation.
             inplace (bool): If True, the geometry column would be changed by the result.
                 Otherwise, a new GeoDataFrame is returned (default: False).

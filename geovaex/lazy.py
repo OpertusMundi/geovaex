@@ -90,6 +90,9 @@ class LazyObj(object):
             result = self._function[i](result, *self._args[i])
         return result
 
+    def to_numpy(self):
+        return self.values()
+
     def _head_and_tail_table(self, n=5, format='plain', to_wkt=True):
         N = len(self._obj)
         if N <= n * 2:
