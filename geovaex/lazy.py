@@ -74,11 +74,11 @@ class LazyObj(object):
             item = slice(item, item + 1)
             result = self._obj.__getitem__(item)
             for i in range(self._counter):
-                result = self._function[i](result, *self._args[i])
+                result = self._function[i](result, *self._args[i], **self._kwargs[i])
             return result[0]
         result = self._obj.__getitem__(item)
         for i in range(self._counter):
-            result = self._function[i](result, *self._args[i])
+            result = self._function[i](result, *self._args[i], **self._kwargs[i])
         return result
 
     def __len__(self):
@@ -87,7 +87,7 @@ class LazyObj(object):
     def values(self):
         result = self._obj
         for i in range(self._counter):
-            result = self._function[i](result, *self._args[i])
+            result = self._function[i](result, *self._args[i], **self._kwargs[i])
         return result
 
     def to_numpy(self):

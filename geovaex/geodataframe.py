@@ -249,7 +249,7 @@ class GeoDataFrame(DataFrameLocal):
             [type] -- [description]
         """
         from .sjoin import sjoin
-        return sjoin(self, other, how=how, op=op, **kwargs)
+        return sjoin(self, other, how=how, op=op, distance=distance, lprefix=lprefix, rprefix=rprefix, lsuffix=lsuffix, rsuffix=rsuffix, allow_duplication=allow_duplication)
 
     def concat(self, other):
         df = super(GeoDataFrame, self).concat(other)
