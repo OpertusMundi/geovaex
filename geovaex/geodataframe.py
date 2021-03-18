@@ -1,7 +1,7 @@
 from .geoseries import GeoSeries
 from vaex.dataframe import DataFrameLocal
 import geovaex.io
-from .operations import constructive, predicates
+from .operations import constructive, predicates, measurement
 import pyarrow as pa
 import numpy as np
 
@@ -225,6 +225,10 @@ class GeoDataFrame(DataFrameLocal):
     @property
     def predicates(self):
         return predicates.Predicates(self)
+
+    @property
+    def measurement(self):
+        return measurement.Measurement(self)
 
     def sjoin(self, other, how='left', op='within', distance=None, lprefix='', rprefix='', lsuffix='', rsuffix='', allow_duplication=True):
         """Spatial join.
