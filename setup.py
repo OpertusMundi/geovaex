@@ -20,11 +20,12 @@ setuptools.setup(
     url="https://github.com/OpertusMundi/geovaex.git",
     packages=setuptools.find_packages(),
     install_requires=[
-        'pygeos>=0.8.0,<1.0.0',
+        'pygeos>=0.9.0,<1.0.0',
         'pyarrow>=3.0.0,<3.0.1',
         'gdal>=3.0.2,<3.2.0',
-        'numpy>=1.18.4,<1.18.5',
-        'vaex>=3.0.0,<3.0.1',
+        'numpy>=1.18.4,<1.20.0',
+        'vaex-core>=2.0.3,<2.0.4',
+        'vaex-arrow>=0.5.1,<0.5.2',
         'pyproj>=2.6.0,<2.7.0'
     ],
     classifiers=[
