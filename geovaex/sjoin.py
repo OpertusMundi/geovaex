@@ -51,6 +51,10 @@ def sjoin(left, right, how='left', op="within", distance=None, lprefix='', rpref
             op = allowed_ops[0:2][(1 - index)%2]
 
     right = right.extract()  # get rid of filters and active_range
+    epsg = left.geometry.crs.to_epsg()
+    # Reproject if required
+    if right.geometry.crs.to_epsg() != epsg:
+        right.geometry.to_crs(epsg)
     assert left.length_unfiltered() == left.length_original()
 
     if op == 'dwithin':
@@ -61,8 +65,11 @@ def sjoin(left, right, how='left', op="within", distance=None, lprefix='', rpref
 
     tree_idx = pg.STRtree(right.geometry)
     l_idx, r_idx = tree_idx.query_bulk(left.geometry, predicate=op)
-    right = right.take(r_idx)
-    right.add_column("join_id", l_idx)
+    if len(r_idx) != 0:
+        right = right.take(r_idx)
+        right.add_column("join_id", l_idx)
+    else:
+        right.add_column("join_id", np.array([None]*len(right)))
     left.add_column("join_id", np.arange(0, len(left)))
 
     if swapped:

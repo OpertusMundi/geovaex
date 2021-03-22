@@ -174,6 +174,8 @@ class GeoSeries(object):
             mask = gs._df._selection_masks['__filter__']
             filtered_indices = mask.first(max_index+1)
             indices = filtered_indices[indices]
+        if len(indices) == 0:
+            return GeoSeries(geometry=pa.array([]), crs=gs._crs)
         if isinstance(gs._geometry, pa.ChunkedArray):
             offset = 0
             chunks = []
