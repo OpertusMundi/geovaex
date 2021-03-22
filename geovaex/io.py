@@ -225,7 +225,11 @@ def export_spatial(gdf, path, driver=None, column_names=None, selection=False, v
     ds = driver.CreateDataSource(path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(gdf.geometry.crs.to_epsg())
-    types = np.unique(pg.get_type_id(gdf.geometry[0:1000]))
+    if len(gdf) > 1000:
+        sample = gdf.sample(n=1000)
+    else:
+        sample = gdf
+    types = np.unique(pg.get_type_id(sample.geometry))
     if len(types) == 2:
         if 0 in types and 4 in types:
             types = [4]

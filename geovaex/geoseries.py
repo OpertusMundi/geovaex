@@ -51,6 +51,8 @@ class GeoSeries(object):
 
     def __getitem__(self, item):
         if isinstance(item, int):
+            if item >= len(self._active_geometry):
+                raise IndexError("index %i is out of bounds" % (item))
             piece = self._active_geometry.__getitem__(slice(item, item+1))
             if isinstance(piece, pa.ChunkedArray):
                 piece = piece.chunk(0)
