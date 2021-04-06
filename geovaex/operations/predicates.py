@@ -15,6 +15,9 @@ class PredicateFilters:
     def filter(self):
         return self._filter
 
+    def to_numpy(self):
+        return self._filter
+
     @property
     def name(self):
         return self._name
@@ -309,3 +312,30 @@ class Predicates:
         geom = _geom_to_pygeos(geom)
         filt = self._predicate(pg.within, geom)
         return PredicateFilters(filt, 'within')
+
+    def has_type(self, type_):
+        """Returns True for geometries of the specific type(s).
+
+        Arguments:
+            type (int|array): Geometric type.
+                - POINT: 0
+                - LINESTRING: 1
+                - LINEARRING: 2
+                - POLYGON: 3
+                - MULTIPOINT: 4
+                - MULTILINESTRING: 5
+                - MULTIPOLYGON: 6
+                - GEOMETRYCOLLECTION: 7
+
+        Returns:
+            (PredicateFilters): A boolean array with the predicate for each index.
+        """
+        if isinstance(type_, int):
+            type_ = [type_]
+        assert isinstance(type_, list)
+        filt = self._predicate(pg.get_type_id)
+        def filtToBool(elem):
+            return elem in type_
+        filtToBoolVec = np.vectorize(filtToBool)
+        filt = filtToBoolVec(filt)
+        return PredicateFilters(filt, 'geometric_type')
