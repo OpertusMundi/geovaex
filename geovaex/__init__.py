@@ -77,9 +77,9 @@ def read_file(path, convert=True, **kwargs):
     return open(arrow_file)
 
 
-def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
+def to_arrow(file, arrow_file, **kwargs):
     """ Alias to geovaex.io.to_arrow. """
-    return geovaex.io.to_arrow(file, arrow_file, chunksize=chunksize, crs=crs, **kwargs)
+    return geovaex.io.to_arrow(file, arrow_file, **kwargs)
 
 
 def from_df(df, geometry, crs=None, metadata=None, column_names=None, virtual=True):
