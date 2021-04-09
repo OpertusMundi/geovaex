@@ -11,7 +11,7 @@ from vaex.dataframe import DataFrameConcatenated, ColumnConcatenatedLazy
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
 import geovaex.io
-from geovaex.geodataframe import GeoDataFrame
+from geovaex.geodataframe import GeoDataFrame, GeoDataFrameConcatenated
 import warnings
 from ._version import __version_tuple__, __version__
 from .patch import *

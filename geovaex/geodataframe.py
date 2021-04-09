@@ -256,9 +256,16 @@ class GeoDataFrame(DataFrameLocal):
         return sjoin(self, other, how=how, op=op, distance=distance, lprefix=lprefix, rprefix=rprefix, lsuffix=lsuffix, rsuffix=rsuffix, allow_duplication=allow_duplication)
 
     def concat(self, other):
-        df = super(GeoDataFrame, self).concat(other)
-        geometry = np.concatenate((self.geometry.to_numpy(), other.geometry.to_numpy()))
-        return geovaex.from_df(geometry=pa.array(geometry), df=df, metadata=self._metadata, crs=self.geometry._crs)
+        dfs = []
+        if isinstance(self, GeoDataFrameConcatenated):
+            dfs.extend(self.dfs)
+        else:
+            dfs.extend([self])
+        if isinstance(other, GeoDataFrameConcatenated):
+            dfs.extend(other.dfs)
+        else:
+            dfs.extend([other])
+        return GeoDataFrameConcatenated(dfs)
 
     def shallow_copy(self, virtual=True, variables=True):
         """Creates a (shallow) copy of the DataFrame.
@@ -283,3 +290,57 @@ class GeoDataFrame(DataFrameLocal):
         # for key, value in self.selection_history_indices.items():
         # df.selection_history_indices[key] = value
         return df
+
+class GeoDataFrameConcatenated(GeoDataFrame):
+    def __init__(self, dfs, name=None):
+        from vaex.column import ColumnConcatenatedLazy
+        crs = np.array([df.geometry.crs.srs for df in dfs])
+        crs = np.unique(crs)
+        if len(crs) > 1:
+            raise ValueError('Concatenating dataframes where different crs not supported.')
+        else:
+            crs = crs[0] if len(crs) == 1 else None
+        metadata = dfs[0]._metadata
+        geoms = []
+        length = 0
+        for df in dfs:
+            for chunk in df.geometry._geometry.chunks:
+                geoms.append(chunk)
+        geometry = pa.chunked_array(geoms)
+
+        super(GeoDataFrameConcatenated, self).__init__(geometry, crs=crs, metadata=metadata)
+
+        self.dfs = dfs = [df.extract() for df in dfs]
+        self.name = name or "-".join(df.name for df in self.dfs)
+        self.path = "-".join(df.path for df in self.dfs)
+        first, tail = dfs[0], dfs[1:]
+        for column_name in first.get_column_names(virtual=False, hidden=True, alias=False):
+            if all([column_name in df.get_column_names(virtual=False, hidden=True, alias=False) for df in tail]):
+                self.column_names.append(column_name)
+        self.columns = {}
+        for column_name in self.get_column_names(virtual=False, hidden=True, alias=False):
+            self.columns[column_name] = ColumnConcatenatedLazy([df[column_name] for df in dfs])
+            self._save_assign_expression(column_name)
+
+        for name in list(first.virtual_columns.keys()):
+            if all([first.virtual_columns[name] == df.virtual_columns.get(name, None) for df in tail]):
+                self.add_virtual_column(name, first.virtual_columns[name])
+            else:
+                self.columns[name] = ColumnConcatenatedLazy([df[name] for df in dfs])
+                self.column_names.append(name)
+            self._save_assign_expression(name)
+
+        for df in tail:
+            if first._column_aliases != df._column_aliases:
+                raise ValueError(f'Concatenating dataframes where different column aliases not supported: {first._column_aliases} != {df._column_aliases}')
+        self._column_aliases = first._column_aliases.copy()
+
+        for df in dfs[:1]:
+            for name, value in list(df.variables.items()):
+                if name not in self.variables:
+                    self.set_variable(name, value, write=False)
+        # self.write_virtual_meta()
+
+        self._length_unfiltered = sum(len(ds) for ds in self.dfs)
+        self._length_original = self._length_unfiltered
+        self._index_end = self._length_unfiltered
