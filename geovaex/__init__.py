@@ -7,7 +7,7 @@ import pyarrow as pa
 import numpy as np
 import collections
 from vaex import utils, superutils, from_arrow_table
-from vaex.dataframe import DataFrameConcatenated
+from vaex.dataframe import DataFrameConcatenated, ColumnConcatenatedLazy
 from vaex.column import ColumnSparse
 from vaex_arrow.dataset import DatasetArrow
 import geovaex.io
@@ -132,6 +132,9 @@ def from_df(df, geometry, crs=None, metadata=None, column_names=None, virtual=Tr
         added.add(name)
         if name in df.columns:
             column = df.columns[name]
+            # Circumvent vaex bug with arrow partitioned arrays. Not optimal, but seems to work.
+            if isinstance(column, ColumnConcatenatedLazy) and df.length_original() != len(column):
+                column = column[:df.length_original()]
             copy.add_column(name, column, dtype=df._dtypes_override.get(name))
             if isinstance(column, ColumnSparse):
                 copy._sparse_matrices[name] = df._sparse_matrices[name]
