@@ -306,7 +306,7 @@ class GeoDataFrameConcatenated(GeoDataFrame):
         for df in dfs:
             if isinstance(df.geometry._geometry, pa.Array):
                 geoms.append(df.geometry._geometry)
-            elif isinstance(df.geometry._geometry, pa.ChunkedArray:
+            elif isinstance(df.geometry._geometry, pa.ChunkedArray):
                 for chunk in df.geometry._geometry.chunks:
                     geoms.append(chunk)
             else:
