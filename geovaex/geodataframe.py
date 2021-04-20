@@ -304,8 +304,13 @@ class GeoDataFrameConcatenated(GeoDataFrame):
         geoms = []
         length = 0
         for df in dfs:
-            for chunk in df.geometry._geometry.chunks:
-                geoms.append(chunk)
+            if isinstance(df.geometry._geometry, pa.Array):
+                geoms.append(df.geometry._geometry)
+            elif isinstance(df.geometry._geometry, pa.ChunkedArray:
+                for chunk in df.geometry._geometry.chunks:
+                    geoms.append(chunk)
+            else:
+                geoms.append(pa.array(df.geometry._geometry))
         geometry = pa.chunked_array(geoms)
 
         super(GeoDataFrameConcatenated, self).__init__(geometry, crs=crs, metadata=metadata)

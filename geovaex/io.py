@@ -207,7 +207,7 @@ def export_csv(gdf, path, latlon=False, geom=True, lat_name='lat', lon_name='lot
         chunk_pdf.to_csv(path_or_buf=path, mode=mode, header=header, sep=sep, index=False, **kwargs)
 
 
-def export_spatial(gdf, path, driver=None, column_names=None, selection=False, virtual=True, chunksize=1000000):
+def export_spatial(gdf, path, driver=None, column_names=None, selection=False, virtual=True, chunksize=1000000, **kwargs):
     """ Writes a GeoDataFrame into a spatial file.
     Parameters:
         gdf (object): A GeoVaex DataFrame.
