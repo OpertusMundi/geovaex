@@ -249,8 +249,11 @@ def export_spatial(gdf, path, driver=None, column_names=None, selection=False, v
     for field_name in fields:
         key = 'str' if fields[field_name] == 'object' else fields[field_name][0:3]
         field = ogr.FieldDefn(field_name, field_types[key])
-        if fields[field_name] == 'str':
-            field.SetWidth(1023)
+        if key == 'str':
+            field.SetWidth(254)
+        elif key == 'flo':
+            field.SetWidth(254)
+            field.SetPrecision(10)
         layer.CreateField(field)
 
     geom_arr = gdf.geometry._geometry
