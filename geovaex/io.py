@@ -313,6 +313,8 @@ def _geometry_from_wkt(table, geom, crs):
         (object): The arrow spatial table.
     """
     geometry = pg.to_wkb(pg.from_wkt(table.column(geom)))
+    if crs is None:
+        crs = 'EPSG:4326'
     field = pa.field('geometry', 'binary', metadata={'crs': crs})
     table = table.append_column(field, [geometry])
     table = table.drop([geom])
