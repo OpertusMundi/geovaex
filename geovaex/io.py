@@ -1,4 +1,4 @@
-from osgeo import ogr, osr
+from osgeo import ogr, osr, gdal
 import os
 import sys
 import pyarrow as pa
@@ -9,7 +9,7 @@ import warnings
 from ._version import __version__
 
 
-def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='wkt', **kwargs):
+def to_arrow_table(file, chunksize=2000000, crs=None, encoding='utf8', lat=None, lon=None, geom='wkt', **kwargs):
     """Reads a file to an arrow table.
     It reads a file in batches and yields a pyarrow table. The size of each chunk is determined
     either by the parameter ``chunksize`` in case of geospatial files which represents number of
@@ -18,6 +18,7 @@ def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='
         file (string): The full path of the input file.
         chunksize (int): The number of features of each chunk (does not apply in CSV; default: 2000000).
         crs (string): The dataset native crs (default: read from file).
+        encoding (string): File encoding.
         lat (string): The column name of latitude (applies only to CSV).
         lon (string): The column name of longitude (applies only to CSV).
         geom (string): The column name of WKT geometry (applies only to CSV).
@@ -28,26 +29,26 @@ def to_arrow_table(file, chunksize=2000000, crs=None, lat=None, lon=None, geom='
     """
     filename = os.path.basename(file)
     try:
-        dataSource = ogr.Open(file, 0)
+        dataSource = gdal.OpenEx(file, open_options=[f'ENCODING={encoding}'])
     except:
         print(sys.exc_info()[1])
     else:
         extension = (os.path.splitext(file)[1]).split('.')
         extension = extension[len(extension) - 1]
-        driver = dataSource.GetDriver().name if dataSource is not None else extension.upper()
+        driver = dataSource.GetDriver().ShortName if dataSource is not None else extension.upper()
         metadata = {'source file': filename, 'driver': driver, 'geovaex version': __version__}
         if driver == 'CSV' or driver == 'TSV':
             delimiter = kwargs.pop('delimiter', ',')
             if extension.lower() == 'tsv':
                 delimiter = "\t"
-            for table in _csv_to_table(file, metadata=metadata, lat=lat, lon=lon, geom=geom, crs=crs, delimiter=delimiter, **kwargs):
+            for table in _csv_to_table(file, metadata=metadata, lat=lat, lon=lon, geom=geom, crs=crs, encoding=encoding, delimiter=delimiter, **kwargs):
                 yield table
         elif driver == 'netCDF':
             raise Exception('NetCDF files are not yet supported by geovaex.')
         else:
             if dataSource is None:
                 raise FileNotFoundError('ERROR: Could not open %s.' % (file))
-            print('Opened file %s, using driver %s.' % (filename, dataSource.GetDriver().name))
+            print('Opened file %s, using driver %s.' % (filename, dataSource.GetDriver().ShortName))
             for table in _datasource_to_table(dataSource, metadata=metadata, chunksize=chunksize, crs=crs):
                 yield table
 
