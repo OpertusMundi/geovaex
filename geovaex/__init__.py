@@ -47,9 +47,13 @@ def open(path):
         metadata = table.schema.metadata
         print('Opened file %s, created by geovaex v%s using %s driver.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
         df = from_arrow_spatial_table(table)
-    else:
-        warnings.warn('Not a spatial arrow file. Returning a Vaex DataFrame.')
-        df = from_arrow_table(table).copy()
+        has_geometry = df.geometry.get_raw_geometry().null_count != len(df.geometry)
+        if has_geometry:
+            return df
+        table = table.drop(['geometry'])
+
+    warnings.warn('Not a spatial arrow file. Returning a Vaex DataFrame.')
+    df = from_arrow_table(table).copy()
     return df
 
 
@@ -67,9 +71,13 @@ def read_file(path, convert=True, **kwargs):
         table = pa.concat_tables(geovaex.io.to_arrow_table(path, **kwargs), promote=False)
         if table.schema.metadata is not None and b'geovaex version' in table.schema.metadata.keys():
             df = from_arrow_spatial_table(table)
-        else:
-            warnings.warn('Not a spatial file. Returning a Vaex DataFrame.')
-            df = from_arrow_table(table).copy()
+            has_geometry = df.geometry.get_raw_geometry().null_count != len(df.geometry)
+            if has_geometry:
+                return df
+            table = table.drop(['geometry'])
+
+        warnings.warn('Not a spatial file. Returning a Vaex DataFrame.')
+        df = from_arrow_table(table).copy()
         return df
 
     arrow_file = os.path.splitext(path)[0] + '.arrow' if convert == True else convert
