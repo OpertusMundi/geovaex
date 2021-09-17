@@ -415,7 +415,7 @@ def _export_table(layer, crs, lower, upper, metadata):
             storage.append(None)
     geometry = pa.array(storage)
     arrow_arrays.append(geometry)
-    fields = [pa.field('geometry', 'binary', metadata={'crs': crs})]
+    fields = [pa.field('geometry', 'binary', metadata={'crs': crs})] if crs is not None else [pa.field('geometry', 'binary')]
     for column_name in column_names:
         if column_name == 'geometry':
             continue
