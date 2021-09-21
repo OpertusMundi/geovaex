@@ -121,10 +121,37 @@ class GeoDataFrame(DataFrameLocal):
         df.drop('tmp', inplace=True)
         return df
 
+    def to_dict(self, keep_geometry=False, **kwargs):
+        if keep_geometry:
+            df = self.to_vaex_df()
+            df.add_column('geometry', self.geometry.to_wkt().values())
+            dictionary = df.to_dict(**kwargs)
+        else:
+            dictionary = super(GeoDataFrame, self).to_dict(**kwargs)
+        return dictionary
+
     def to_geopandas_df(self, column_names=None, selection=None, strings=True, virtual=True, index_name=None, parallel=True, chunk_size=None):
+        """Return a geopandas dataframe.
+
+        Parameters:
+            column_names: list of column names, to export, when None DataFrame.get_column_names(strings=strings, virtual=virtual) is used.
+            selection: Name of selection to use (or True for the 'default'), or all the data (when selection is None or False), or a list of selections.
+            strings: argument passed to DataFrame.get_column_names when column_names is None.
+            virtual: argument passed to DataFrame.get_column_names when column_names is None
+            index_name: if this column is given it is used for the index of the DataFrame
+            parallel: Evaluate the (virtual) columns in parallel
+            chunk_size: Return an iterator with cuts of the object in lenght of this size
+
+        Returns:
+            (geopandas.geodataframe.GeoDataFrame): The resulted dataframe
+        """
+        import warnings
+        try:
+            import geopandas as gpd
+        except ImportError:
+            warnings.warn('GeoPandas is not installed.')
+            return None
         from shapely.wkb import loads
-        # TODO: Check if geopandas is installed
-        import geopandas as gpd
         pd_df = super(GeoDataFrame, self).to_pandas_df(column_names=column_names, selection=selection, strings=strings, virtual=virtual, index_name=index_name, parallel=parallel, chunk_size=chunk_size)
         geometries = self.geometry.to_numpy()
         geometries = [loads(g) for g in geometries]
