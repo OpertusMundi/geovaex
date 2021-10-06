@@ -10,8 +10,8 @@ def from_wkb(arr):
     return pg.from_wkb(arr)
 
 @Lazy
-def to_wkt(arr):
-    return pg.to_wkt(from_wkb(arr))
+def to_wkt(arr, **kwargs):
+    return pg.to_wkt(from_wkb(arr), **kwargs)
 
 @Lazy
 def to_wkb(arr):

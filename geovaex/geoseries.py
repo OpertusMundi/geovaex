@@ -200,8 +200,8 @@ class GeoSeries(object):
     def to_pygeos(self):
         return from_wkb(self._active_geometry)
 
-    def to_wkt(self):
-        return to_wkt(self._active_geometry)
+    def to_wkt(self, **kwargs):
+        return to_wkt(self._active_geometry, **kwargs)
 
     def union_all(self):
         return union_all(self._active_geometry)

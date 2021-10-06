@@ -121,10 +121,20 @@ class GeoDataFrame(DataFrameLocal):
         df.drop('tmp', inplace=True)
         return df
 
-    def to_dict(self, keep_geometry=False, **kwargs):
+    def to_dict(self, keep_geometry=True, rounding_precision=-1, **kwargs):
+        """Exports dataframe to dictionary.
+
+        Parameters:
+            keep_geometry (bool, optional): Whether to keep geometry column.
+            rounding_precision (int, optional): Rounding precision (number of digits) for WKT geometry coordinates; -1 to keep all digits.
+            **kwargs: Additional arguments for vaex to_dict.
+
+        Returns:
+            (dict) resulted dictionary
+        """
         if keep_geometry:
             df = self.to_vaex_df()
-            df.add_column('geometry', self.geometry.to_wkt().values())
+            df.add_column('geometry', self.geometry.to_wkt(rounding_precision=rounding_precision).values())
             dictionary = df.to_dict(**kwargs)
         else:
             dictionary = super(GeoDataFrame, self).to_dict(**kwargs)
