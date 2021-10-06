@@ -121,7 +121,7 @@ class GeoDataFrame(DataFrameLocal):
         df.drop('tmp', inplace=True)
         return df
 
-    def to_dict(self, keep_geometry=True, rounding_precision=-1, **kwargs):
+    def to_dict(self, keep_geometry=False, rounding_precision=-1, **kwargs):
         """Exports dataframe to dictionary.
 
         Parameters:
