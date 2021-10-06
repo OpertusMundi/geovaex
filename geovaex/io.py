@@ -9,7 +9,7 @@ import warnings
 from ._version import __version__
 
 
-def to_arrow_table(file, chunksize=2000000, crs=None, encoding='utf8', lat=None, lon=None, geom='wkt', **kwargs):
+def to_arrow_table(file, chunksize=2000000, crs=None, encoding='utf8', lat=None, lon=None, geom=None, **kwargs):
     """Reads a file to an arrow table.
     It reads a file in batches and yields a pyarrow table. The size of each chunk is determined
     either by the parameter ``chunksize`` in case of geospatial files which represents number of
@@ -82,7 +82,7 @@ def _datasource_to_table(dataSource, metadata={}, chunksize=2000000, crs=None):
         yield table
 
 
-def _csv_to_table(file, metadata=None, lat=None, lon=None, geom='wkt', crs=None, **kwargs):
+def _csv_to_table(file, metadata=None, lat=None, lon=None, geom=None, crs=None, **kwargs):
     """Yields an arrow table from a stream of CSV data.
     Parameters:
         file (string): The full path of the input file.
@@ -101,9 +101,13 @@ def _csv_to_table(file, metadata=None, lat=None, lon=None, geom='wkt', crs=None,
     convert_options = _convert_options_from_dict(**kwargs)
     if lat is not None and lon is not None:
         type_of_geom = 'latlon'
-    else:
+    elif geom is not None:
         type_of_geom = 'wkt'
+    else:
+        type_of_geom = None
     batches = csv.open_csv(file, read_options=read_options, parse_options=parse_options, convert_options=convert_options)
+    if type_of_geom is None:
+        type_of_geom, geom, lat, lon = _get_geom_info(batches.schema.names)
     print('Opened file %s, using pyarrow CSV reader.' % (os.path.basename(file)))
 
     eof = False
@@ -119,11 +123,58 @@ def _csv_to_table(file, metadata=None, lat=None, lon=None, geom='wkt', crs=None,
                     table = _geometry_from_latlon(table, lat, lon, crs=crs)
                 else:
                     table = _geometry_from_wkt(table, geom, crs=crs)
+            # Not spatial file
+            except TypeError:
+                pass
             except KeyError:
                 pass
             else:
                 table = table.replace_schema_metadata(metadata=metadata)
             yield table
+
+
+def _get_geom_info(schema):
+    """Get geometry info for CSV file according to GeoCSV specification.
+
+    See also https://giswiki.hsr.ch/GeoCSV.
+
+    Parameters:
+        schema (list): List of column names.
+
+    Returns:
+        (tuple)
+    """
+    lat, lon, geom, type_of_geom = None, None, None, None
+    if 'wkt' in schema:
+        geom = 'wkt'
+        type_of_geom = 'wkt'
+    elif 'WKT' in schema:
+        geom = 'WKT'
+        type_of_geom = 'wkt'
+    elif 'geometry' in schema:
+        geom = 'geometry'
+        type_of_geom = 'wkt'
+    elif 'longitude' in schema and 'latitude' in schema:
+        lat = 'latitude'
+        lon = 'longitude'
+        type_of_geom = 'latlon'
+    elif 'lon' in schema and 'lat' in schema:
+        lat = 'lat'
+        lon = 'lon'
+        type_of_geom = 'latlon'
+    elif 'long' in schema and 'lat' in schema:
+        lat = 'lat'
+        lon = 'long'
+        type_of_geom = 'latlon'
+    elif 'x' in schema and 'y' in schema:
+        lat = 'y'
+        lon = 'x'
+        type_of_geom = 'latlon'
+    elif 'X' in schema and 'Y' in schema:
+        lat = 'Y'
+        lon = 'X'
+        type_of_geom = 'latlon'
+    return (type_of_geom, geom, lat, lon)
 
 
 def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
@@ -313,6 +364,11 @@ def _geometry_from_wkt(table, geom, crs):
     Returns:
         (object): The arrow spatial table.
     """
+    if geom == 'geometry':
+        column_names = table.column_names
+        column_names[column_names.index('geometry')] = 'geometry_'
+        table = table.rename_columns(column_names)
+        geom = 'geometry_'
     geometry = pg.to_wkb(pg.from_wkt(table.column(geom)))
     if crs is None:
         crs = 'EPSG:4326'
