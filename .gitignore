@@ -4,3 +4,5 @@ spatial.py
 notebooks/_*
 notebooks/.ipynb_checkpoints
 notebooks/data/local/
+build
+geovaex.egg*

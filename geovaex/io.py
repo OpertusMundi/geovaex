@@ -403,7 +403,8 @@ def _read_options_from_dict(**kwargs):
         block_size=kwargs.pop('block_size', 1073741824),
         skip_rows=kwargs.pop('skip_rows', 0),
         column_names=kwargs.pop('column_names', None),
-        autogenerate_column_names=kwargs.pop('autogenerate_column_names', False)
+        autogenerate_column_names=kwargs.pop('autogenerate_column_names', False),
+        encoding=kwargs.pop('encoding', 'utf8'),
     )
 
 
