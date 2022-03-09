@@ -460,24 +460,14 @@ def _export_table(layer, crs, lower, upper, metadata):
     column_names = _get_layer_definition(layer)
     arrow_arrays = []
 
-    storage = []
-    for i in range(lower, upper):
-        feature = layer.GetFeature(i)
-        if feature is not None:
-            geom = feature.GetGeometryRef()
-            if geom is not None:
-                storage.append(feature.GetGeometryRef().ExportToWkb())
-            else:
-                storage.append(None)
-        else:
-            storage.append(None)
-    geometry = pa.array(storage)
+    features = [layer.GetNextFeature() for i in range(lower, upper)]
+    geometry = pa.array(feature.GetGeometryRef().ExportToWkb() if feature.GetGeometryRef() is not None else None for feature in features if feature is not None)
     arrow_arrays.append(geometry)
     fields = [pa.field('geometry', 'binary', metadata={'crs': crs})] if crs is not None else [pa.field('geometry', 'binary')]
     for column_name in column_names:
         if column_name == 'geometry':
             continue
-        arr = pa.array(layer.GetFeature(i).GetField(column_name) if layer.GetFeature(i) is not None else None for i in range(lower, upper))
+        arr = pa.array(feature.GetField(column_name) for feature in features if feature is not None)
         arrow_arrays.append(arr)
         fields.append(pa.field(column_name, arr.type))
     table = pa.Table.from_arrays(arrow_arrays, schema=pa.schema(fields, metadata=metadata))
