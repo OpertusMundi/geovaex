@@ -4,7 +4,6 @@ try:
 except:
     sys.exit('ERROR: cannot find GDAL/OGR modules')
 import pyarrow as pa
-import numpy as np
 import collections
 from vaex import utils, superutils, from_arrow_table
 from vaex.dataframe import DataFrameConcatenated, ColumnConcatenatedLazy
@@ -20,6 +19,8 @@ from .patch import *
 def custom_formatwarning(msg, *args, **kwargs):
     """Ignore everything except the message."""
     return str(msg) + '\n'
+
+
 warnings.formatwarning = custom_formatwarning
 
 
@@ -45,7 +46,9 @@ def open(path):
     table = pa.Table.from_batches(batches)
     if table.schema.metadata is not None and b'geovaex version' in table.schema.metadata.keys():
         metadata = table.schema.metadata
-        print('Opened file %s, created by geovaex v%s using %s driver.' % (os.path.basename(path), metadata[b'geovaex version'].decode(), metadata[b'driver'].decode()))
+        print(f"Opened file {os.path.basename(path)}, "
+              f"created by geovaex v{metadata[b'geovaex version'].decode()} "
+              f"using {metadata[b'driver'].decode()} driver.")
         df = from_arrow_spatial_table(table)
         has_geometry = df.geometry.get_raw_geometry().null_count != len(df.geometry)
         if has_geometry:
@@ -67,7 +70,7 @@ def read_file(path, convert=True, **kwargs):
     Returns:
         (object) A GeoDataFrame object.
     """
-    if convert == False:
+    if not convert:
         table = pa.concat_tables(geovaex.io.to_arrow_table(path, **kwargs), promote=False)
         if table.schema.metadata is not None and b'geovaex version' in table.schema.metadata.keys():
             df = from_arrow_spatial_table(table)
@@ -80,7 +83,7 @@ def read_file(path, convert=True, **kwargs):
         df = from_arrow_table(table).copy()
         return df
 
-    arrow_file = os.path.splitext(path)[0] + '.arrow' if convert == True else convert
+    arrow_file = os.path.splitext(path)[0] + '.arrow' if convert else convert
     to_arrow(path, arrow_file, **kwargs)
     return open(arrow_file)
 
@@ -225,7 +228,7 @@ def _split_table(table, num_chunks):
     new_schema = pa.schema([s for s in table.schema if s.name != 'geometry'])
     for chunk in range(num_chunks):
         pa_arrays = [table.column(entry.name).chunk(chunk) for entry in new_schema]
-        yield (pa.Table.from_arrays(pa_arrays, schema=new_schema), chunk)
+        yield pa.Table.from_arrays(pa_arrays, schema=new_schema), chunk
 
 
 def _create_df(table):

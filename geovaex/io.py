@@ -69,9 +69,9 @@ def _datasource_to_table(dataSource, metadata={}, chunksize=2000000, crs=None):
     native_crs = _get_crs(layer)
     crs = crs if crs is not None else native_crs
     if native_crs != crs:
-        warnings.warn('Given CRS %s different from native CRS %s.' % (crs, native_crs))
+        warnings.warn(f'Given CRS {crs} different from native CRS {native_crs}.')
     length = layer.GetFeatureCount()
-    print('Found %i features.' % (length))
+    print(f'Found {length} features.')
 
     metadata['layer'] = layer.GetName()
     lower = 0

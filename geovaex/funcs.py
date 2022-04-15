@@ -1,38 +1,44 @@
 import pygeos as pg
-import pyarrow as pa
 from .lazy import Lazy, LazyObj
 import numpy as np
 import pyproj
 import warnings
 
+
 @Lazy
 def from_wkb(arr):
     return pg.from_wkb(arr)
+
 
 @Lazy
 def to_wkt(arr, **kwargs):
     return pg.to_wkt(from_wkb(arr), **kwargs)
 
+
 @Lazy
 def to_wkb(arr):
     return pg.to_wkb(arr)
+
 
 @Lazy
 def convex_hull(arr):
     return pg.to_wkb(pg.convex_hull(pg.from_wkb(arr)))
 
+
 @Lazy
 def get_coordinates(arr):
     return pg.get_coordinates(pg.from_wkb(arr))
+
 
 @Lazy
 def get_inverted_coordinates(arr):
     def invert_list(a):
         if isinstance(a[0], np.ndarray):
-            return np.array([np.flip(arr) for arr in a])
+            return np.array([np.flip(array) for array in a])
         else:
             return np.flip(a)
     return invert_list(pg.get_coordinates(pg.from_wkb(arr)))
+
 
 @Lazy
 def transform(arr, src_crs, tgt_crs):
@@ -44,15 +50,18 @@ def transform(arr, src_crs, tgt_crs):
     projected = pg.set_coordinates(geometry, np.array(new_coords).T)
     return pg.to_wkb(projected)
 
+
 def total_bounds(arr):
     if isinstance(arr, LazyObj):
         arr = arr.values()
     return pg.to_wkb(pg.box(*pg.total_bounds(pg.from_wkb(arr))))
 
+
 def union_all(arr):
     if isinstance(arr, LazyObj):
         arr = arr.values()
     return pg.union_all(from_wkb(arr))
+
 
 def convex_hull_all(arr):
     if isinstance(arr, LazyObj):
@@ -60,13 +69,16 @@ def convex_hull_all(arr):
     points = pg.union_all(pg.extract_unique_points(pg.from_wkb(arr)))
     return pg.to_wkb(pg.convex_hull(points))
 
+
 @Lazy
 def extract_unique_points(arr):
     return pg.extract_unique_points(from_wkb(arr))
 
+
 def within(arr, geometry):
     geometry = pg.from_wkb(geometry)
     return pg.within(from_wkb(arr), geometry)
+
 
 @Lazy
 def constructive(arr, operation, *args, **kwargs):
@@ -105,6 +117,6 @@ def constructive(arr, operation, *args, **kwargs):
     elif operation == 'voronoi_polygons':
         geometries = pg.voronoi_polygons(pg.from_wkb(arr), **kwargs)
     else:
-        warnings.warn('Operation %s not supported.' % (operation))
+        warnings.warn(f'Operation {operation} not supported.')
         return None
     return pg.to_wkb(geometries)

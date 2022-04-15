@@ -2,6 +2,7 @@ import pygeos as pg
 import concurrent.futures
 import numpy as np
 
+
 def _geom_to_pygeos(geom):
     if isinstance(geom, str):
         geom = pg.from_wkt(geom)
@@ -12,6 +13,7 @@ def _geom_to_pygeos(geom):
     else:
         raise ValueError("'geom' should be WKT, WKB or pygeos Geometry.")
     return geom
+
 
 class Measurement:
     """Spatial Measurement.
