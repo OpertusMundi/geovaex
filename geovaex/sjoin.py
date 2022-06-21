@@ -2,6 +2,7 @@ from . import GeoDataFrame
 import pygeos as pg
 import numpy as np
 
+
 def sjoin(left, right, how='left', op="within", distance=None, lprefix='', rprefix='', lsuffix='', rsuffix='', allow_duplication=True):
     """Spatial join.
 
@@ -48,7 +49,7 @@ def sjoin(left, right, how='left', op="within", distance=None, lprefix='', rpref
         except ValueError:
             pass
         else:
-            op = allowed_ops[0:2][(1 - index)%2]
+            op = allowed_ops[0:2][(1 - index) % 2]
 
     right = right.extract()  # get rid of filters and active_range
     epsg = left.geometry.crs.to_epsg()
@@ -75,7 +76,8 @@ def sjoin(left, right, how='left', op="within", distance=None, lprefix='', rpref
     if swapped:
         left, right = right, left
 
-    left = left.join(right, on="join_id", lprefix=lprefix, rprefix=rprefix, lsuffix=lsuffix, rsuffix=rsuffix, allow_duplication=allow_duplication, how=how)
+    left = left.join(right, on="join_id", lprefix=lprefix, rprefix=rprefix,
+                     lsuffix=lsuffix, rsuffix=rsuffix, allow_duplication=allow_duplication, how=how)
     left.drop([lprefix + 'join_id' + lsuffix, rprefix + 'join_id' + rsuffix], inplace=True)
 
     return left

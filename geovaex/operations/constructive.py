@@ -1,4 +1,4 @@
-class Constructive():
+class Constructive:
     """Constructive Geometric Operations.
 
     Applies PyGEOS constructive geometric operations to GeoDataFrame.
@@ -227,4 +227,5 @@ class Constructive():
         Returns:
             (object) GeoDataFrame
         """
-        return self._geometry_constructive('voronoi_polygons', inplace=inplace, tolerance=tolerance, extend_to=extend_to, only_edges=only_edges, **kwargs)
+        return self._geometry_constructive('voronoi_polygons', inplace=inplace, tolerance=tolerance,
+                                           extend_to=extend_to, only_edges=only_edges, **kwargs)

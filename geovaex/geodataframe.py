@@ -5,6 +5,7 @@ from .operations import constructive, predicates, measurement
 import pyarrow as pa
 import numpy as np
 
+
 class GeoDataFrame(DataFrameLocal):
     def __init__(self, geometry, crs=None, path='geodataframe', metadata=None, column_names=None):
         super(GeoDataFrame, self).__init__(name=path, path=path, column_names=column_names or [])
@@ -328,7 +329,9 @@ class GeoDataFrame(DataFrameLocal):
         # df.selection_history_indices[key] = value
         return df
 
+
 class GeoDataFrameConcatenated(GeoDataFrame):
+
     def __init__(self, dfs, name=None):
         from vaex.column import ColumnConcatenatedLazy
         crs = np.array([df.geometry.crs.srs for df in dfs])
@@ -339,7 +342,6 @@ class GeoDataFrameConcatenated(GeoDataFrame):
             crs = crs[0] if len(crs) == 1 else None
         metadata = dfs[0]._metadata
         geoms = []
-        length = 0
         for df in dfs:
             if isinstance(df.geometry._geometry, pa.Array):
                 geoms.append(df.geometry._geometry)

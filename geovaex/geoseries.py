@@ -1,12 +1,15 @@
 import pyarrow as pa
-import pygeos as pg
-import numpy as np
 import concurrent.futures
+import pygeos as pg
 import pyproj
-from .funcs import *
+import numpy as np
+
+from .funcs import transform, from_wkb, to_wkt, union_all, convex_hull, extract_unique_points, get_inverted_coordinates, \
+    get_coordinates, total_bounds, convex_hull_all, within, constructive
 from .lazy import LazyObj
 
-class GeoSeries(object):
+
+class GeoSeries:
 
     def __init__(self, geometry, crs=None, df=None):
         self._geometry = geometry
@@ -52,7 +55,7 @@ class GeoSeries(object):
     def __getitem__(self, item):
         if isinstance(item, int):
             if item >= len(self._active_geometry):
-                raise IndexError("index %i is out of bounds" % (item))
+                raise IndexError(f"index {item} is out of bounds")
             piece = self._active_geometry.__getitem__(slice(item, item+1))
             if isinstance(piece, pa.ChunkedArray):
                 piece = piece.chunk(0)
@@ -68,9 +71,8 @@ class GeoSeries(object):
             stop = min(stop, len(self))
             assert step in [None, 1]
             if self.filtered:
-                count_check = self._df.count()  # fill caches and masks
                 mask = self._df._selection_masks['__filter__']
-                start, stop = mask.indices(start, stop-1) # -1 since it is inclusive
+                start, stop = mask.indices(start, stop-1)  # -1 since it is inclusive
                 assert start != -1
                 assert stop != -1
                 stop = stop+1  # +1 to make it inclusive
@@ -169,7 +171,7 @@ class GeoSeries(object):
             # we translate the indices that refer to filters row indices to
             # indices of the unfiltered row indices
             indices = np.asarray(indices)
-            gs._df.count() # make sure the mask is filled
+            gs._df.count()  # make sure the mask is filled
             max_index = indices.max()
             mask = gs._df._selection_masks['__filter__']
             filtered_indices = mask.first(max_index+1)
@@ -181,8 +183,8 @@ class GeoSeries(object):
             chunks = []
             for chunk in gs._geometry.chunks:
                 size = len(chunk)
-                chunk_indices = list(filter(lambda x: offset <= x < size + offset, indices))
-                chunk_indices = pa.array(map(lambda x: x - offset, chunk_indices))
+                chunk_indices = [x for x in indices if offset <= x < size + offset]
+                chunk_indices = pa.array([x - offset for x in chunk_indices])
                 if len(chunk_indices) > 0:
                     chunks.append(chunk.take(chunk_indices))
                 offset += size

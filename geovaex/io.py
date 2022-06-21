@@ -69,9 +69,9 @@ def _datasource_to_table(dataSource, metadata={}, chunksize=2000000, crs=None):
     native_crs = _get_crs(layer)
     crs = crs if crs is not None else native_crs
     if native_crs != crs:
-        warnings.warn('Given CRS %s different from native CRS %s.' % (crs, native_crs))
+        warnings.warn(f'Given CRS {crs} different from native CRS {native_crs}.')
     length = layer.GetFeatureCount()
-    print('Found %i features.' % (length))
+    print(f'Found {length} features.')
 
     metadata['layer'] = layer.GetName()
     lower = 0
@@ -189,7 +189,16 @@ def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
     """
     with pa.OSFile(arrow_file, 'wb') as sink:
         writer = None
-        for table in to_arrow_table(file, chunksize=chunksize, crs=crs, **kwargs):
+        # by default assume utf-8 encoding
+        encoding = 'utf-8'
+        if not os.path.isfile(file):
+            cpg_file = [os.path.join(file, f) for f in os.listdir(file) if f.endswith('.cpg')]
+            if len(cpg_file) == 1:
+                # if there is a cpg file read the encoding out of its first line
+                cpg_file = cpg_file[0]
+                with open(cpg_file) as f:
+                    encoding = f.readline()
+        for table in to_arrow_table(file, chunksize=chunksize, crs=crs, encoding=encoding, **kwargs):
             b = table.to_batches()
             if writer is None:
                 writer = pa.RecordBatchStreamWriter(sink, b[0].schema)

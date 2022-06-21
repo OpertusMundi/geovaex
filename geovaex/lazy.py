@@ -1,7 +1,8 @@
 from pyarrow import ChunkedArray, Array, array, concat_arrays
 import pygeos as pg
 
-class LazyObj(object):
+
+class LazyObj:
 
     def __init__(self):
         self._function = []
@@ -45,8 +46,8 @@ class LazyObj(object):
             chunks = []
             for chunk in lz._obj.chunks:
                 size = len(chunk)
-                chunk_indices = list(filter(lambda x: offset <= x < size + offset, indices))
-                chunk_indices = array(map(lambda x: x - offset, chunk_indices))
+                chunk_indices = [x for x in indices if offset <= x < size + offset]
+                chunk_indices = array([x - offset for x in chunk_indices])
                 if len(chunk_indices) > 0:
                     chunks.append(chunk.take(chunk_indices))
                 offset += size
@@ -93,7 +94,7 @@ class LazyObj(object):
     def to_numpy(self):
         return self.values()
 
-    def _head_and_tail_table(self, n=5, format='plain', to_wkt=True):
+    def _head_and_tail_table(self, n=5, format='plain'):
         N = len(self._obj)
         if N <= n * 2:
             table = self._as_table(0, N, format=format)
@@ -102,11 +103,11 @@ class LazyObj(object):
         expression = "Expression = %s" % '*'.join(self._function[i-1].__name__ for i in range(self._counter, 0, -1))
         head = "Length: {:,} type: {}".format(N, type(self[0]))
         line = ''
-        for i in range(len(head)):
+        for _ in range(len(head)):
             line += '-'
         return expression + "\n" + head + "\n" + line + "\n" + table
 
-    def _as_table(self, i1, i2, j1=None, j2=None, format='plain', to_wkt=True):
+    def _as_table(self, i1, i2, j1=None, j2=None, format='plain'):
         import tabulate
 
         values_list = []
@@ -126,7 +127,8 @@ class LazyObj(object):
 
         return str(tabulate.tabulate(values_list, tablefmt=format))
 
-class Lazy(object):
+
+class Lazy:
     def __init__(self, function):
         self._function = function
 
