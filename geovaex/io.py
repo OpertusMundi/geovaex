@@ -189,7 +189,16 @@ def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
     """
     with pa.OSFile(arrow_file, 'wb') as sink:
         writer = None
-        for table in to_arrow_table(file, chunksize=chunksize, crs=crs, **kwargs):
+        cpg_file = [os.path.join(file, f) for f in os.listdir(file) if f.endswith('.cpg')]
+        if len(cpg_file) == 1:
+            # if there is a cpg file read the encoding out of its first line
+            cpg_file = cpg_file[0]
+            with open(cpg_file) as f:
+                encoding = f.readline()
+        else:
+            # else by default assume utf-8
+            encoding = 'utf-8'
+        for table in to_arrow_table(file, chunksize=chunksize, crs=crs, encoding=encoding, **kwargs):
             b = table.to_batches()
             if writer is None:
                 writer = pa.RecordBatchStreamWriter(sink, b[0].schema)
