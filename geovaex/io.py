@@ -1,3 +1,4 @@
+from random import sample
 from osgeo import ogr, osr, gdal
 import os
 import sys
@@ -5,8 +6,14 @@ import pyarrow as pa
 from pyarrow import csv
 import pygeos as pg
 import numpy as np
+import pandas as pd
 import warnings
 from ._version import __version__
+
+NUMBER_OF_SAMPLES = 1000
+IS_GEOM_THRESHOLD = 0.9
+SET_OF_ACCEPTABLE_SHAPES = ['point', 'linestring', 'multipoint', 'multilinestring',
+                            'polygon', 'multipolygon', 'geometrycollection', 'linearring']
 
 
 def to_arrow_table(file, chunksize=2000000, crs=None, encoding='utf8', lat=None, lon=None, geom=None, **kwargs):
@@ -107,7 +114,7 @@ def _csv_to_table(file, metadata=None, lat=None, lon=None, geom=None, crs=None, 
         type_of_geom = None
     batches = csv.open_csv(file, read_options=read_options, parse_options=parse_options, convert_options=convert_options)
     if type_of_geom is None:
-        type_of_geom, geom, lat, lon = _get_geom_info(batches.schema.names)
+        type_of_geom, geom, lat, lon = _get_geom_info(batches.schema.names, file, parse_options.delimiter)
     print('Opened file %s, using pyarrow CSV reader.' % (os.path.basename(file)))
 
     eof = False
@@ -133,14 +140,15 @@ def _csv_to_table(file, metadata=None, lat=None, lon=None, geom=None, crs=None, 
             yield table
 
 
-def _get_geom_info(schema):
+def _get_geom_info(schema, file, delimiter):
     """Get geometry info for CSV file according to GeoCSV specification.
 
     See also https://giswiki.hsr.ch/GeoCSV.
 
     Parameters:
         schema (list): List of column names.
-
+        file (string): The full path of the input file.
+        delimiter (string): The delimiter of the csv file
     Returns:
         (tuple)
     """
@@ -154,17 +162,32 @@ def _get_geom_info(schema):
     elif 'geometry' in schema:
         geom = 'geometry'
         type_of_geom = 'wkt'
+    elif 'GEOMETRY' in schema:
+        geom = 'GEOMETRY'
+        type_of_geom = 'wkt'
     elif 'longitude' in schema and 'latitude' in schema:
         lat = 'latitude'
         lon = 'longitude'
+        type_of_geom = 'latlon'
+    elif 'LONGITUDE' in schema and 'LATITUDE' in schema:
+        lat = 'LATITUDE'
+        lon = 'LONGITUDE'
         type_of_geom = 'latlon'
     elif 'lon' in schema and 'lat' in schema:
         lat = 'lat'
         lon = 'lon'
         type_of_geom = 'latlon'
+    elif 'LON' in schema and 'LAT' in schema:
+        lat = 'LAT'
+        lon = 'LON'
+        type_of_geom = 'latlon'
     elif 'long' in schema and 'lat' in schema:
         lat = 'lat'
         lon = 'long'
+        type_of_geom = 'latlon'
+    elif 'LONG' in schema and 'LAT' in schema:
+        lat = 'LAT'
+        lon = 'LONG'
         type_of_geom = 'latlon'
     elif 'x' in schema and 'y' in schema:
         lat = 'y'
@@ -174,7 +197,37 @@ def _get_geom_info(schema):
         lat = 'Y'
         lon = 'X'
         type_of_geom = 'latlon'
-    return (type_of_geom, geom, lat, lon)
+    else:
+        detected_wkt_geom_col = _find_csv_geom_column(schema, file, delimiter)
+        if detected_wkt_geom_col is not None:
+            geom = detected_wkt_geom_col
+            type_of_geom = 'wkt'
+    return type_of_geom, geom, lat, lon
+
+
+def _find_csv_geom_column(schema, file: str, delimiter):
+    """Detect the name of the column containing the geometric information"""
+
+    for column in schema:
+        column_data = pd.read_csv(file, usecols=[column], sep=delimiter)
+        if _is_geom(column_data.iloc[:, 0]):
+            return column
+    return None
+
+
+def _is_geom(column_data):
+    if column_data.dtype != 'object':
+        return False
+    try:
+        matches = 0
+        materialized_column_data = list(column_data)
+        for row in sample(materialized_column_data, min(NUMBER_OF_SAMPLES, len(materialized_column_data))):
+            is_shape = row.strip().lower().split('(')[0].strip() in SET_OF_ACCEPTABLE_SHAPES
+            if row.strip().endswith(')') and is_shape:
+                matches += 1
+        return matches > IS_GEOM_THRESHOLD * NUMBER_OF_SAMPLES
+    except AttributeError:
+        return False
 
 
 def to_arrow(file, arrow_file, chunksize=2000000, crs=None, **kwargs):
@@ -361,7 +414,10 @@ def _geometry_from_latlon(table, lat_field, lon_field, crs):
     lat = table.column(lat_field)
     lon = table.column(lon_field)
     geometry = pg.to_wkb(pg.points(lon, lat))
-    field = pa.field('geometry', 'binary', metadata={'crs': crs})
+    if crs is None:
+        field = pa.field('geometry', pa.binary())
+    else:
+        field = pa.field('geometry', pa.binary(), metadata={'crs': crs})
     table = table.append_column(field, [geometry])
     table = table.drop([lat_field, lon_field])
     return table
@@ -386,7 +442,7 @@ def _geometry_from_wkt(table, geom, crs):
     geometry = pg.to_wkb(pg.from_wkt(table.column(geom)))
     if crs is None:
         crs = 'EPSG:4326'
-    field = pa.field('geometry', 'binary', metadata={'crs': crs})
+    field = pa.field('geometry', pa.binary(), metadata={'crs': crs})
     table = table.append_column(field, [geometry])
     table = table.drop([geom])
     return table
@@ -477,7 +533,7 @@ def _export_table(layer, crs, lower, upper, metadata):
     features = [layer.GetNextFeature() for i in range(lower, upper)]
     geometry = pa.array(feature.GetGeometryRef().ExportToWkb() if feature.GetGeometryRef() is not None else None for feature in features if feature is not None)
     arrow_arrays.append(geometry)
-    fields = [pa.field('geometry', 'binary', metadata={'crs': crs})] if crs is not None else [pa.field('geometry', 'binary')]
+    fields = [pa.field('geometry', pa.binary(), metadata={'crs': crs})] if crs is not None else [pa.field('geometry', pa.binary())]
     for column_name in column_names:
         if column_name == 'geometry':
             continue
